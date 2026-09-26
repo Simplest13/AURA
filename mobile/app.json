@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "AURA",
+    "slug": "aura-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#07070D"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.aura.assistant",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "AURA connects to your wearable system via Bluetooth Low Energy for real-time voice interaction.",
+        "NSMicrophoneUsageDescription": "AURA captures your speech for real-time transcription and AI processing."
+      }
+    },
+    "android": {
+      "package": "com.aura.assistant",
+      "adaptiveIcon": {
+        "backgroundColor": "#07070D"
+      },
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET"
+      ]
+    }
+  }
+}
+

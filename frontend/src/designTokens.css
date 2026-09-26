@@ -1,0 +1,13 @@
+:root {
+  --aura-bg: #07070D;
+  --aura-surface: #0F101A;
+  --aura-surface-elevated: #151625;
+  --aura-primary: #7C3AED;
+  --aura-secondary: #4F46E5;
+  --aura-cyan: #22D3EE;
+  --aura-text: #F8FAFC;
+  --aura-text-muted: #94A3B8;
+  --aura-border: #25263A;
+  --aura-success: #22C55E;
+  --aura-error: #EF4444;
+}

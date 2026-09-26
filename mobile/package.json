@@ -1,0 +1,34 @@
+{
+  "name": "aura-mobile",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "npx expo start",
+    "android": "npx expo run:android",
+    "build:check": "tsc --noEmit",
+    "test": "node test/runner.mjs"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-navigation/bottom-tabs": "^7.19.2",
+    "@react-navigation/native": "^7.4.1",
+    "@react-navigation/native-stack": "^7.19.2",
+    "expo": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.81.4",
+    "react-native-safe-area-context": "5.2.0",
+    "react-native-screens": "~4.15.0",
+    "react-native-svg": "15.11.2",
+    "react-native-web": "0.21.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.10",
+    "@types/react-native": "^0.73.0",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
