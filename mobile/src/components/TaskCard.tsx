@@ -1,6 +1,12 @@
+/**
+ * TaskRow — editorial list row with checkbox and accent priority marker.
+ */
+
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { colors } from "../theme/colors";
+import { radii } from "../theme/spacing";
+import { Icon } from "./Icon";
 import { StudyTask } from "../types/study";
 
 interface TaskCardProps {
@@ -16,50 +22,37 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDelete,
   style,
 }) => {
-  const getPriorityColor = () => {
-    if (task.priority === "high") return colors.error;
-    if (task.priority === "medium") return colors.warning;
-    return colors.success;
-  };
+  const priorityTint =
+    task.priority === "high" ? colors.coral : task.priority === "medium" ? colors.yellow : colors.sage;
 
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.row, style]}>
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onToggle}
-        style={[
-          styles.checkbox,
-          task.completed && styles.checkboxChecked,
-        ]}
+        style={[styles.checkbox, task.completed && styles.checkboxChecked]}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        {task.completed && <Text style={styles.checkmark}>✓</Text>}
+        {task.completed && <Icon name="check" size={13} color={colors.paper} />}
       </TouchableOpacity>
 
       <View style={styles.details}>
-        <Text style={styles.subject}>{task.subjectName}</Text>
         <Text
-          style={[
-            styles.title,
-            task.completed && styles.titleCompleted,
-          ]}
+          style={[styles.title, task.completed && styles.titleCompleted]}
           numberOfLines={2}
         >
           {task.title}
         </Text>
         <View style={styles.metaRow}>
-          <Text style={styles.deadline}>🕒 {task.deadline}</Text>
-          <View
-            style={[
-              styles.priorityBadge,
-              { borderColor: getPriorityColor() },
-            ]}
-          >
-            <Text style={[styles.priorityText, { color: getPriorityColor() }]}>
-              {task.priority.toUpperCase()}
-            </Text>
-          </View>
+          <Text style={styles.subject}>{task.subjectName}</Text>
+          <Text style={styles.metaDot}>·</Text>
+          <Text style={styles.meta}>{task.deadline}</Text>
         </View>
       </View>
+
+      {task.priority === "high" && !task.completed && (
+        <View style={[styles.priorityMarker, { backgroundColor: priorityTint }]} />
+      )}
 
       {onDelete && (
         <TouchableOpacity
@@ -67,7 +60,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           style={styles.deleteBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={styles.deleteText}>✕</Text>
+          <Icon name="x" size={14} color={colors.textDim} />
         </TouchableOpacity>
       )}
     </View>
@@ -75,82 +68,68 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 14,
+  row: {
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 8,
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+    width: 20,
+    height: 20,
+    borderRadius: radii.xs,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
-    marginTop: 2,
-    backgroundColor: colors.surface2,
+    marginRight: 13,
+    marginTop: 1,
   },
   checkboxChecked: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  checkmark: {
-    color: colors.accentContrast,
-    fontSize: 13,
-    fontWeight: "700",
+    backgroundColor: colors.olive,
+    borderColor: colors.olive,
   },
   details: {
     flex: 1,
   },
-  subject: {
-    color: colors.accent2,
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
   title: {
-    color: colors.text1,
-    fontSize: 14,
+    color: colors.ink,
+    fontSize: 15,
     fontWeight: "500",
-    lineHeight: 18,
-    marginBottom: 6,
+    lineHeight: 20,
+    marginBottom: 3,
   },
   titleCompleted: {
     textDecorationLine: "line-through",
-    color: colors.text3,
+    color: colors.textDim,
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 5,
   },
-  deadline: {
-    color: colors.text3,
-    fontSize: 11,
+  subject: {
+    color: colors.textMuted,
+    fontSize: 12.5,
   },
-  priorityBadge: {
-    borderWidth: 1,
-    borderRadius: radii.xs,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+  metaDot: {
+    color: colors.textDim,
+    fontSize: 12.5,
   },
-  priorityText: {
-    fontSize: 9.5,
-    fontWeight: "700",
+  meta: {
+    color: colors.textDim,
+    fontSize: 12.5,
+  },
+  priorityMarker: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 7,
+    marginRight: 8,
   },
   deleteBtn: {
     padding: 4,
-    marginLeft: 8,
-  },
-  deleteText: {
-    color: colors.text3,
-    fontSize: 13,
+    marginLeft: 4,
   },
 });

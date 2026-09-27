@@ -1,3 +1,7 @@
+/**
+ * StudyPlannerScreen — task CRUD on the editorial canvas.
+ */
+
 import React, { useState } from "react";
 import {
   View,
@@ -7,27 +11,47 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing as s, radii } from "../theme/spacing";
+import { useLayout } from "../theme/responsive";
 import { Header } from "../components/Header";
 import { TaskCard } from "../components/TaskCard";
 import { AuraButton } from "../components/AuraButton";
+import { Icon } from "../components/Icon";
+import { MonoLabel } from "../components/Typography";
 import { useStudyStore } from "../stores/studyStore";
 import { TaskPriority } from "../types/study";
 
 export const StudyPlannerScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { tasks, addTask, toggleTask, deleteTask } = useStudyStore();
+  const insets = useSafeAreaInsets();
+  const { contentMaxWidth, gutter } = useLayout();
+  const { tasks, addTask, toggleTask, deleteTask, isSyncing, backendOffline } = useStudyStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("Thermodynamics");
-  const [deadline, setDeadline] = useState("Tomorrow, 5:00 PM");
-  const [priority, setPriority] = useState<TaskPriority>("high");
+  const [subject, setSubject] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [priority, setPriority] = useState<TaskPriority>("medium");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleCreate = () => {
-    if (!title.trim()) return;
-    addTask(title.trim(), subject, deadline, priority);
-    setTitle("");
-    setShowAddForm(false);
+  const handleCreate = async () => {
+    if (!title.trim() || isSaving) return;
+    setIsSaving(true);
+    try {
+      await addTask(
+        title.trim(),
+        subject.trim() || "General",
+        deadline.trim() || "No deadline",
+        priority
+      );
+      setTitle("");
+      setSubject("");
+      setDeadline("");
+      setShowAddForm(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filteredTasks = tasks.filter((t) => {
@@ -38,71 +62,73 @@ export const StudyPlannerScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   return (
     <View style={styles.container}>
-      <Header
-        title="Study Planner"
-        subtitle="Manage Tasks, Deadlines & Priorities"
-        showBack={true}
-        onBack={() => navigation.goBack()}
-        rightAction={
-          <TouchableOpacity
-            style={styles.addToggleBtn}
-            onPress={() => setShowAddForm(!showAddForm)}
-          >
-            <Text style={styles.addToggleText}>{showAddForm ? "✕ Cancel" : "+ Add Task"}</Text>
-          </TouchableOpacity>
-        }
-      />
+      <View style={{ maxWidth: contentMaxWidth, width: "100%", alignSelf: "center" }}>
+        <Header
+          title="Planner"
+          subtitle={backendOffline ? "Offline — changes stay local" : "Synced"}
+          showBack={true}
+          onBack={() => navigation.goBack()}
+          showDeviceBadge={false}
+          rightAction={
+            <TouchableOpacity
+              style={styles.addToggleBtn}
+              onPress={() => setShowAddForm(!showAddForm)}
+            >
+              <Icon name={showAddForm ? "x" : "plus"} size={15} color={colors.ink} />
+              <Text style={styles.addToggleText}>{showAddForm ? "Cancel" : "Task"}</Text>
+            </TouchableOpacity>
+          }
+        />
+      </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Add Task Form */}
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: gutter,
+            maxWidth: contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+            paddingBottom: 60 + insets.bottom,
+          },
+        ]}
+      >
         {showAddForm && (
           <View style={styles.addForm}>
-            <Text style={styles.formTitle}>New Study Task</Text>
+            <MonoLabel color={colors.ink}>NEW TASK</MonoLabel>
 
-            <Text style={styles.inputLabel}>Task Title</Text>
             <TextInput
               style={styles.input}
               value={title}
               onChangeText={setTitle}
-              placeholder="e.g. Derive Carnot engine efficiency formula"
-              placeholderTextColor={colors.text3}
+              placeholder="Review entropy derivations"
+              placeholderTextColor={colors.textDim}
             />
 
             <View style={styles.formRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>Subject</Text>
-                <TextInput
-                  style={styles.input}
-                  value={subject}
-                  onChangeText={setSubject}
-                  placeholder="e.g. Thermodynamics"
-                  placeholderTextColor={colors.text3}
-                />
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>Deadline</Text>
-                <TextInput
-                  style={styles.input}
-                  value={deadline}
-                  onChangeText={setDeadline}
-                  placeholder="e.g. Friday, 4:00 PM"
-                  placeholderTextColor={colors.text3}
-                />
-              </View>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={subject}
+                onChangeText={setSubject}
+                placeholder="Subject"
+                placeholderTextColor={colors.textDim}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={deadline}
+                onChangeText={setDeadline}
+                placeholder="Friday · 16:00"
+                placeholderTextColor={colors.textDim}
+              />
             </View>
 
-            <Text style={styles.inputLabel}>Priority</Text>
             <View style={styles.priorityRow}>
-              {(["high", "medium", "low"] as TaskPriority[]).map((p) => {
+              {(["low", "medium", "high"] as TaskPriority[]).map((p) => {
                 const isSelected = priority === p;
                 return (
                   <TouchableOpacity
                     key={p}
-                    style={[
-                      styles.priorityOption,
-                      isSelected && styles.priorityOptionSelected,
-                    ]}
+                    style={[styles.priorityOption, isSelected && styles.priorityOptionSelected]}
                     onPress={() => setPriority(p)}
                   >
                     <Text
@@ -111,7 +137,7 @@ export const StudyPlannerScreen: React.FC<{ navigation: any }> = ({ navigation }
                         isSelected && styles.priorityOptionTextSelected,
                       ]}
                     >
-                      {p.toUpperCase()}
+                      {p[0].toUpperCase() + p.slice(1)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -119,54 +145,49 @@ export const StudyPlannerScreen: React.FC<{ navigation: any }> = ({ navigation }
             </View>
 
             <AuraButton
-              title="Save Study Task"
-              onPress={handleCreate}
+              title={isSyncing ? "Saving…" : "Save task"}
+              onPress={() => void handleCreate()}
               variant="primary"
-              style={{ marginTop: 8 }}
+              loading={isSaving}
+              disabled={!title.trim()}
+              style={{ marginTop: s.md }}
             />
           </View>
         )}
 
-        {/* Filter Pills */}
+        {/* Filters */}
         <View style={styles.filterRow}>
           {(["all", "active", "completed"] as const).map((f) => {
             const isSelected = filter === f;
+            const count = tasks.filter((t) =>
+              f === "all" ? true : f === "active" ? !t.completed : t.completed
+            ).length;
             return (
               <TouchableOpacity
                 key={f}
                 style={[styles.filterPill, isSelected && styles.filterPillSelected]}
                 onPress={() => setFilter(f)}
               >
-                <Text
-                  style={[
-                    styles.filterPillText,
-                    isSelected && styles.filterPillTextSelected,
-                  ]}
-                >
-                  {f.toUpperCase()} ({tasks.filter((t) => (f === "all" ? true : f === "active" ? !t.completed : t.completed)).length})
-                </Text>
+                <MonoLabel color={isSelected ? colors.ink : colors.textDim}>
+                  {f.toUpperCase()} {String(count).padStart(2, "0")}
+                </MonoLabel>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Task List */}
         {filteredTasks.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No tasks found for this filter.</Text>
-          </View>
+          <Text style={styles.emptyText}>Nothing here.</Text>
         ) : (
           filteredTasks.map((task) => (
             <TaskCard
               key={task.id}
               task={task}
-              onToggle={() => toggleTask(task.id)}
-              onDelete={() => deleteTask(task.id)}
+              onToggle={() => void toggleTask(task.id)}
+              onDelete={() => void deleteTask(task.id)}
             />
           ))
         )}
-
-        <View style={{ height: 80 }} />
       </ScrollView>
     </View>
   );
@@ -175,117 +196,99 @@ export const StudyPlannerScreen: React.FC<{ navigation: any }> = ({ navigation }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: s.xl,
   },
   addToggleBtn: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderColor: colors.ink,
     borderRadius: radii.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: colors.surfaceElevated,
   },
   addToggleText: {
-    color: colors.accent,
-    fontSize: 12,
+    color: colors.ink,
+    fontSize: 12.5,
     fontWeight: "600",
   },
   addForm: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 16,
-    marginBottom: 20,
-  },
-  formTitle: {
-    color: colors.text1,
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
+    borderRadius: radii.sm,
+    padding: s.lg,
+    marginBottom: s.xxl,
   },
   formRow: {
     flexDirection: "row",
-    gap: 12,
-  },
-  inputLabel: {
-    color: colors.text2,
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 4,
+    gap: s.sm,
   },
   input: {
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radii.sm,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: colors.text1,
-    fontSize: 13,
-    marginBottom: 12,
+    paddingVertical: 10,
+    color: colors.ink,
+    fontSize: 14.5,
+    marginBottom: s.sm,
+    marginTop: s.md,
   },
   priorityRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: s.sm,
   },
   priorityOption: {
     flex: 1,
     paddingVertical: 8,
     alignItems: "center",
-    backgroundColor: colors.surface2,
-    borderRadius: radii.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
   priorityOptionSelected: {
-    borderColor: colors.accent,
+    borderColor: colors.ink,
     backgroundColor: colors.accentSoft,
   },
   priorityOptionText: {
-    color: colors.text3,
-    fontSize: 11,
-    fontWeight: "700",
+    color: colors.textMuted,
+    fontSize: 12.5,
+    fontWeight: "500",
   },
   priorityOptionTextSelected: {
-    color: colors.accent,
+    color: colors.ink,
   },
   filterRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: s.md,
   },
   filterPill: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface,
+    paddingVertical: 7,
+    borderRadius: radii.sm,
+    backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: colors.border,
   },
   filterPillSelected: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  filterPillText: {
-    color: colors.text2,
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  filterPillTextSelected: {
-    color: colors.accent,
-  },
-  emptyContainer: {
-    paddingVertical: 40,
-    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.borderLight,
   },
   emptyText: {
-    color: colors.text3,
-    fontSize: 13,
+    color: colors.textDim,
+    fontSize: 14,
+    paddingVertical: s.xxl,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

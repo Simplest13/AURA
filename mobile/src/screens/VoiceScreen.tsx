@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from "react";
+/**
+ * VoiceScreen — the most editorial surface.
+ * Vast whitespace, one small orb, serif for the spoken query, mono labels,
+ * a single control. Motion only where it communicates voice state.
+ */
+
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,19 +12,23 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing as s } from "../theme/spacing";
+import { useLayout } from "../theme/responsive";
 import { AuraOrb } from "../components/AuraOrb";
-import { VoiceWaveform } from "../components/VoiceWaveform";
 import { AuraButton } from "../components/AuraButton";
-import { GlassCard } from "../components/GlassCard";
-import { StatusIndicator } from "../components/StatusIndicator";
-import { Header } from "../components/Header";
+import { Icon } from "../components/Icon";
+import { SerifText, MonoLabel } from "../components/Typography";
+import { MarkdownText } from "../utils/markdown";
 import { useVoiceStore } from "../stores/voiceStore";
 import { useDeviceStore } from "../stores/deviceStore";
-import { ConnectionState } from "../types/device";
 import { VoiceServiceImplementation } from "../services/ai/VoiceService";
+import { isWebSpeechSupported } from "../services/speech/WebSpeechService";
 
 export const VoiceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
+  const { contentMaxWidth, gutter } = useLayout();
   const {
     state: voiceState,
     liveTranscript,
@@ -27,33 +37,35 @@ export const VoiceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     reset,
   } = useVoiceStore();
 
-  const {
-    connectionState,
-    batteryLevel,
-    simulateButtonPress,
-    onWearableButtonPress,
-  } = useDeviceStore();
-
+  const { simulateButtonPress } = useDeviceStore();
   const [voiceService] = useState(() => new VoiceServiceImplementation());
+  const [isBusy, setIsBusy] = useState(false);
 
-  // Subscribe to wearable button press events
-  useEffect(() => {
-    const unsubscribe = onWearableButtonPress(() => {
-      handleStartListening("Wearable button pressed");
-    });
+  React.useEffect(() => {
+    const unsubscribe = useDeviceStore
+      .getState()
+      .onWearableButtonPress(() => {
+        void handleStartListening();
+      });
     return () => unsubscribe();
   }, [voiceService]);
 
-  const handleStartListening = async (triggerSource = "User tap") => {
-    if (voiceState !== "idle") {
-      voiceService.stopListening();
+  const handleStartListening = async () => {
+    if (voiceState !== "idle" && voiceState !== "error") {
+      await voiceService.stopSpeaking();
       return;
     }
-    await voiceService.startListening();
+    setIsBusy(true);
+    try {
+      await voiceService.startListening();
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const handleStop = () => {
-    voiceService.stopListening();
+    voiceService.stopSpeaking();
+    reset();
   };
 
   const getStateLabel = () => {
@@ -65,304 +77,204 @@ export const VoiceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       case "speaking":
         return "SPEAKING";
       case "error":
-        return "ERROR";
+        return "SOMETHING WENT WRONG";
       default:
-        return "READY (IDLE)";
+        return "READY";
     }
   };
 
+  const sttSupported = isWebSpeechSupported();
+
   return (
-    <View style={styles.screenContainer}>
-      <Header
-        title="Voice Cockpit"
-        subtitle="Real-time Wearable AI Pipeline"
-        onDeviceBadgePress={() => navigation.navigate("Device")}
-        rightAction={
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: gutter,
+            maxWidth: contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+            paddingBottom: 110 + insets.bottom,
+          },
+        ]}
+      >
+        {/* Head */}
+        <View style={styles.headRow}>
+          <MonoLabel color={colors.ink}>VOICE</MonoLabel>
           <TouchableOpacity
-            onPress={() => navigation.navigate("Device")}
-            style={styles.headerAction}
+            onPress={() => {
+              simulateButtonPress();
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.headerActionText}>Wearable ⚙</Text>
+            <MonoLabel color={colors.textDim}>DEVICE PRESS →</MonoLabel>
           </TouchableOpacity>
-        }
-      />
-
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* Connection & Microphone Status Bar */}
-        <View style={styles.statusRow}>
-          <StatusIndicator
-            label={`Wearable: ${connectionState === ConnectionState.CONNECTED ? `${batteryLevel}%` : "Offline"}`}
-            status={connectionState === ConnectionState.CONNECTED ? "success" : "warning"}
-          />
-          <StatusIndicator
-            label={`Mic: ${voiceState === "listening" ? "Active" : "Standby"}`}
-            status={voiceState === "listening" ? "accent" : "success"}
-          />
         </View>
 
-        {/* State Label */}
-        <View style={styles.stateTag}>
-          <Text style={styles.stateTagText}>{getStateLabel()}</Text>
+        {/* Orb */}
+        <View style={styles.orbSection}>
+          <AuraOrb state={voiceState === "idle" ? "idle" : voiceState} size={96} />
+          <MonoLabel color={colors.textMuted} style={{ marginTop: 20 }}>
+            {getStateLabel()}
+          </MonoLabel>
         </View>
 
-        {/* Central Glowing Aura Orb */}
-        <View style={styles.orbContainer}>
-          <AuraOrb state={voiceState} size={180} />
-          {voiceState === "listening" || voiceState === "speaking" ? (
-            <VoiceWaveform
-              isActive={true}
-              barColor={voiceState === "listening" ? colors.glow : colors.cyan}
-              style={styles.waveform}
-            />
-          ) : (
-            <View style={{ height: 48 }} />
+        {/* Transcript — serif for the human, markdown for AURA */}
+        <View style={styles.transcriptSection}>
+          {liveTranscript ? (
+            <>
+              <MonoLabel color={colors.textDim}>YOU</MonoLabel>
+              <SerifText size={22} italic style={styles.queryText}>
+                "{liveTranscript}"
+              </SerifText>
+            </>
+          ) : null}
+
+          {aiResponse ? (
+            <>
+              <View style={styles.divider} />
+              <MonoLabel color={colors.textDim}>AURA</MonoLabel>
+              <MarkdownText content={aiResponse} baseFontSize={14} />
+            </>
+          ) : null}
+
+          {!liveTranscript && !aiResponse && (
+            <SerifText size={19} italic color={colors.textDim} style={styles.placeholder}>
+              {sttSupported
+                ? "Ask, and AURA listens."
+                : "Voice input needs Chrome or Edge — try a query below."}
+            </SerifText>
           )}
         </View>
 
-        {/* Dynamic Transcript & AI Response Card */}
-        <GlassCard style={styles.transcriptCard}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.speakerLabel}>YOU</Text>
-            {voiceState === "listening" && (
-              <Text style={styles.liveIndicator}>● LIVE</Text>
-            )}
-          </View>
-          <Text style={styles.transcriptText}>
-            {liveTranscript || '"What is the difference between TCP and UDP?"'}
-          </Text>
-
-          <View style={styles.divider} />
-
-          <View style={styles.cardHeader}>
-            <Text style={styles.speakerLabel}>AURA</Text>
-            {voiceState === "speaking" && (
-              <Text style={[styles.liveIndicator, { color: colors.cyan }]}>
-                ● SPEAKING
-              </Text>
-            )}
-          </View>
-          <Text style={styles.aiResponseText}>
-            {aiResponse ||
-              'Press "Start Listening" or simulate a Wearable Button Press to begin.'}
-          </Text>
-        </GlassCard>
-
-        {/* Error message card if present */}
         {errorMessage && (
-          <GlassCard style={styles.errorCard} variant="bordered">
-            <Text style={styles.errorText}>⚠ {errorMessage}</Text>
-          </GlassCard>
+          <View style={styles.errorBox}>
+            <Icon name="alert-circle" size={13} color={colors.error} />
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
         )}
 
-        {/* Voice Control Buttons */}
-        <View style={styles.controlsRow}>
-          {voiceState === "idle" ? (
+        {/* Control */}
+        <View style={styles.controls}>
+          {voiceState === "idle" || voiceState === "error" ? (
             <AuraButton
-              title="◉ Start Listening"
+              title={isBusy ? "Starting…" : "Start listening"}
               variant="primary"
               size="lg"
-              onPress={() => handleStartListening()}
-              style={styles.primaryVoiceBtn}
+              onPress={() => void handleStartListening()}
+              disabled={isBusy}
+              style={styles.primaryBtn}
             />
           ) : (
             <AuraButton
-              title="✕ Stop / Reset"
-              variant="danger"
+              title="Stop"
+              variant="secondary"
               size="lg"
               onPress={handleStop}
-              style={styles.primaryVoiceBtn}
+              style={styles.primaryBtn}
             />
           )}
-
-          <AuraButton
-            title="⚡ Wearable Press"
-            variant="secondary"
-            size="lg"
-            onPress={simulateButtonPress}
-            style={styles.simulateBtn}
-          />
         </View>
 
-        {/* Simulated Prompt Presets for Testing */}
+        {/* Test queries */}
         <View style={styles.presetsSection}>
-          <Text style={styles.presetsLabel}>TEST DEMO QUERIES:</Text>
-          <View style={styles.presetButtons}>
-            <TouchableOpacity
-              style={styles.presetChip}
-              onPress={() => voiceService.simulateQuery("What is the difference between TCP and UDP?")}
-            >
-              <Text style={styles.presetText}>TCP vs UDP</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.presetChip}
-              onPress={() => voiceService.simulateQuery("Explain entropy and the second law of thermodynamics.")}
-            >
-              <Text style={styles.presetText}>Entropy</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.presetChip}
-              onPress={() => voiceService.simulateQuery("How does binary search work?")}
-            >
-              <Text style={styles.presetText}>Binary Search</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.presetChip}
-              onPress={() => voiceService.simulateQuery("What is machine learning?")}
-            >
-              <Text style={styles.presetText}>Machine Learning</Text>
-            </TouchableOpacity>
+          <MonoLabel color={colors.textDim}>TRY ASKING</MonoLabel>
+          <View style={styles.presetRow}>
+            {[
+              { label: "TCP vs UDP", q: "What is the difference between TCP and UDP?" },
+              { label: "Entropy", q: "Explain entropy and the second law of thermodynamics." },
+              { label: "Binary search", q: "How does binary search work?" },
+              { label: "Machine learning", q: "What is machine learning?" },
+            ].map((preset) => (
+              <TouchableOpacity
+                key={preset.label}
+                style={styles.presetChip}
+                disabled={voiceState === "thinking" || voiceState === "speaking"}
+                onPress={() => void voiceService.simulateQuery(preset.q)}
+              >
+                <Text style={styles.presetText}>{preset.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-
-        <View style={{ height: 90 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  screenContainer: {
+  screen: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
-  contentContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    alignItems: "center",
+  content: {
+    paddingTop: s.xl,
   },
-  headerAction: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: colors.surface2,
-    borderRadius: radii.sm,
-  },
-  headerActionText: {
-    color: colors.text2,
-    fontSize: 12,
-  },
-  statusRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 16,
-  },
-  stateTag: {
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderRadius: radii.full,
-    marginBottom: 20,
-  },
-  stateTagText: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-  },
-  orbContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 10,
-  },
-  waveform: {
-    marginTop: 10,
-  },
-  transcriptCard: {
-    width: "100%",
-    padding: 18,
-    marginVertical: 16,
-    backgroundColor: colors.surface2,
-  },
-  cardHeader: {
+  headRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
   },
-  speakerLabel: {
-    color: colors.text3,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
+  orbSection: {
+    alignItems: "center",
+    paddingVertical: s.vast,
   },
-  liveIndicator: {
-    color: colors.glow,
-    fontSize: 11,
-    fontWeight: "700",
+  transcriptSection: {
+    minHeight: 140,
   },
-  transcriptText: {
-    color: colors.text1,
-    fontSize: 16,
-    fontWeight: "500",
-    lineHeight: 22,
-    marginBottom: 12,
+  queryText: {
+    marginTop: 8,
+    lineHeight: 30,
+  },
+  placeholder: {
+    lineHeight: 30,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.borderSoft,
-    marginVertical: 10,
+    backgroundColor: colors.border,
+    marginVertical: s.xl,
   },
-  aiResponseText: {
-    color: colors.text2,
-    fontSize: 14.5,
-    lineHeight: 22,
-  },
-  errorCard: {
-    width: "100%",
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
     borderColor: colors.error,
+    borderRadius: 8,
     padding: 12,
-    marginBottom: 16,
+    marginTop: s.lg,
   },
   errorText: {
     color: colors.error,
-    fontSize: 13,
+    fontSize: 12.5,
+    flex: 1,
   },
-  controlsRow: {
-    flexDirection: "row",
-    gap: 12,
+  controls: {
+    marginTop: s.xxl,
+  },
+  primaryBtn: {
     width: "100%",
-    marginBottom: 20,
-  },
-  primaryVoiceBtn: {
-    flex: 3,
-  },
-  simulateBtn: {
-    flex: 2,
-    borderColor: colors.accent,
   },
   presetsSection: {
-    width: "100%",
-    alignItems: "center",
-    marginTop: 8,
+    marginTop: s.huge,
   },
-  presetsLabel: {
-    color: colors.text3,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 10,
-  },
-  presetButtons: {
+  presetRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    justifyContent: "center",
+    marginTop: s.md,
   },
   presetChip: {
-    backgroundColor: colors.surface,
+    backgroundColor: "transparent",
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radii.full,
+    borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   presetText: {
-    color: colors.text2,
-    fontSize: 12,
-    fontWeight: "500",
+    color: colors.textMuted,
+    fontSize: 12.5,
   },
 });

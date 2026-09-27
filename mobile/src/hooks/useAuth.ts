@@ -1,82 +1,52 @@
 /**
  * useAuth Hook
- * Manages authentication, user session, and token persistence.
+ * Thin wrapper over the auth store + backend auth API.
+ * No fake local fallback accounts — errors from the backend are surfaced honestly.
  */
 
 import { useAuthStore } from "../stores/authStore";
-import { StorageService } from "../services/storage/StorageService";
+import { SecureTokenStorage } from "../services/storage/SecureTokenStorage";
 import { ApiClient } from "../services/api/ApiClient";
 import { User } from "../types/auth";
+
+interface AuthResponse {
+  token: string;
+  user: User;
+}
 
 export const useAuth = () => {
   const { user, token, isAuthenticated, isLoading, login, logout, updateUser } = useAuthStore();
 
-  const handleLogin = async (email: string, password?: string) => {
-    try {
-      // In real mode, call backend /api/auth/login
-      // If backend is offline or mock, generate valid session
-      let authUser: User = {
-        id: `user-${Date.now()}`,
-        name: email.split("@")[0] || "Shivam",
-        email,
-      };
-
-      try {
-        const res = await ApiClient.post<{ token: string; user: User }>("/api/auth/login", {
-          email,
-          password: password || "password123",
-        });
-        if (res && res.token) {
-          await StorageService.setItem("auth_token", res.token);
-          login(email, res.token, res.user);
-          return;
-        }
-      } catch (backendErr) {
-        console.warn("[useAuth] Backend auth unreachable, logging in locally:", backendErr);
-      }
-
-      await StorageService.setItem("auth_token", "mock-session-token");
-      login(email, "mock-session-token", authUser);
-    } catch (err) {
-      console.error("[useAuth] Login failure:", err);
-      throw err;
+  const handleLogin = async (email: string, password: string): Promise<void> => {
+    // Throws with the backend's message on failure (invalid credentials, network down, …)
+    const res = await ApiClient.post<AuthResponse>("/api/auth/login", { email, password });
+    if (!res?.token || !res?.user) {
+      throw new Error("Login failed: malformed response from server");
     }
+    await SecureTokenStorage.setToken(res.token);
+    login(res.user.email ?? email, res.token, res.user);
   };
 
-  const handleRegister = async (name: string, email: string, password?: string) => {
-    try {
-      let authUser: User = {
-        id: `user-${Date.now()}`,
-        name,
-        email,
-      };
-
-      try {
-        const res = await ApiClient.post<{ token: string; user: User }>("/api/auth/register", {
-          name,
-          email,
-          password: password || "password123",
-        });
-        if (res && res.token) {
-          await StorageService.setItem("auth_token", res.token);
-          login(email, res.token, res.user);
-          return;
-        }
-      } catch (backendErr) {
-        console.warn("[useAuth] Backend register unreachable, creating local session:", backendErr);
-      }
-
-      await StorageService.setItem("auth_token", "mock-session-token");
-      login(email, "mock-session-token", authUser);
-    } catch (err) {
-      console.error("[useAuth] Register failure:", err);
-      throw err;
+  const handleRegister = async (name: string, email: string, password: string): Promise<void> => {
+    // Duplicate email / validation errors come back as proper error messages
+    const res = await ApiClient.post<AuthResponse>("/api/auth/register", { name, email, password });
+    if (!res?.token || !res?.user) {
+      throw new Error("Registration failed: malformed response from server");
     }
+    await SecureTokenStorage.setToken(res.token);
+    login(res.user.email ?? email, res.token, res.user); // automatic sign-in after registration
   };
 
-  const handleLogout = async () => {
-    await StorageService.removeItem("auth_token");
-    logout();
+  const handleLogout = async (): Promise<void> => {
+    // Best-effort server notification (stateless JWT — the real work is client-side)
+    try {
+      if (useAuthStore.getState().token) {
+        await ApiClient.post("/api/auth/logout");
+      }
+    } catch {
+      // Server unreachable — local session is cleared regardless
+    }
+    await logout();
   };
 
   return {
@@ -90,4 +60,3 @@ export const useAuth = () => {
     updateUser,
   };
 };
-

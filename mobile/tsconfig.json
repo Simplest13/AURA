@@ -3,7 +3,8 @@
     "target": "esnext",
     "module": "esnext",
     "lib": [
-      "es2022"
+      "es2022",
+      "dom"
     ],
     "allowJs": true,
     "jsx": "react-native",

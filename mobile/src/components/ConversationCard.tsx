@@ -1,6 +1,11 @@
+/**
+ * ConversationCard — flat conversation row: title, snippet, meta.
+ */
+
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { colors } from "../theme/colors";
+import { Icon } from "./Icon";
 import { Conversation } from "../types/chat";
 
 interface ConversationCardProps {
@@ -23,26 +28,27 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.75}
       onPress={onPress}
-      style={[styles.container, style]}
+      style={[styles.row, style]}
     >
       <View style={styles.content}>
-        <View style={styles.titleRow}>
-          {conversation.isPinned && <Text style={styles.pinnedIcon}>📌 </Text>}
-          <Text style={styles.title} numberOfLines={1}>
-            {conversation.title}
-          </Text>
-        </View>
+        <Text style={styles.title} numberOfLines={1}>
+          {conversation.title}
+        </Text>
         <Text style={styles.snippet} numberOfLines={1}>
           {snippet}
         </Text>
+      </View>
+
+      <View style={styles.metaCol}>
         <Text style={styles.meta}>
-          {conversation.messages.length} messages ·{" "}
-          {new Date(conversation.updatedAt).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
+          {new Date(conversation.updatedAt).toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
           })}
         </Text>
       </View>
+
+      <Icon name="chevron-right" size={16} color={colors.textDim} />
 
       {onDelete && (
         <TouchableOpacity
@@ -50,7 +56,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.deleteBtn}
         >
-          <Text style={styles.deleteText}>✕</Text>
+          <Icon name="x" size={14} color={colors.textDim} />
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -58,48 +64,36 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 14,
+  row: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
   },
   content: {
     flex: 1,
     marginRight: 10,
   },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  pinnedIcon: {
-    fontSize: 12,
-  },
   title: {
-    color: colors.text1,
+    color: colors.text,
     fontSize: 14,
-    fontWeight: "600",
-    flex: 1,
+    fontWeight: "500",
   },
   snippet: {
-    color: colors.text2,
-    fontSize: 12,
-    marginBottom: 6,
+    color: colors.textDim,
+    fontSize: 12.5,
+    marginTop: 2,
+  },
+  metaCol: {
+    alignItems: "flex-end",
+    marginRight: 6,
   },
   meta: {
-    color: colors.text3,
+    color: colors.textDim,
     fontSize: 11,
   },
   deleteBtn: {
     padding: 6,
-  },
-  deleteText: {
-    color: colors.text3,
-    fontSize: 14,
   },
 });

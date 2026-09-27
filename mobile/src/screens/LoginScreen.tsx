@@ -6,195 +6,281 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
-import { AuraOrb } from "../components/AuraOrb";
-import { AuraButton } from "../components/AuraButton";
-import { useAuthStore } from "../stores/authStore";
+import { colors } from "../theme/colors";
+import { spacing as s, radii } from "../theme/spacing";
+import { SerifText, MonoLabel } from "../components/Typography";
+import { useAuth } from "../hooks/useAuth";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Login — premium editorial entry. Real JWT auth against the AURA backend.
+ */
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [tab, setTab] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("shivam@alignsoul.co");
-  const [password, setPassword] = useState("••••••••");
-  const [fullName, setFullName] = useState("Shivam");
-  const { login } = useAuthStore();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { login, register } = useAuth();
 
-  const handleSubmit = () => {
-    login(email);
-    navigation.replace("MainTabs");
+  const handleSubmit = async () => {
+    setError(null);
+    if (tab === "login") {
+      if (!email.trim() || !password) {
+        setError("Enter your email and password to continue.");
+        return;
+      }
+      if (!EMAIL_RE.test(email.trim())) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+    } else {
+      if (!fullName.trim() || fullName.trim().length < 2) {
+        setError("Please enter your name.");
+        return;
+      }
+      if (!email.trim() || !EMAIL_RE.test(email.trim())) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters.");
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      if (tab === "login") {
+        await login(email.trim(), password);
+      } else {
+        await register(fullName.trim(), email.trim(), password);
+      }
+      navigation.replace("MainTabs");
+    } catch (err: any) {
+      const network =
+        err?.code === "NETWORK_ERROR" ||
+        err?.code === "TIMEOUT" ||
+        err?.message === "Network request failed";
+      setError(
+        network
+          ? "Can't reach the AURA backend. Start it with `cd backend && npm start`, then try again."
+          : err?.message ?? "Authentication failed. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <AuraOrb state="idle" size={80} style={styles.orb} />
-      <Text style={styles.brandTitle}>AURA</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        <MonoLabel color={colors.ink}>AURA</MonoLabel>
 
-      <View style={styles.card}>
-        <View style={styles.tabsRow}>
+        <SerifText size={38} style={styles.headline}>
+          A wearable{"\n"}
+          <SerifText size={38} italic>
+            that listens.
+          </SerifText>
+        </SerifText>
+
+        <View style={styles.formBlock}>
+          {/* Tabs */}
+          <View style={styles.tabsRow}>
+            <TouchableOpacity
+              style={[styles.tab, tab === "login" && styles.tabActive]}
+              onPress={() => {
+                setTab("login");
+                setError(null);
+              }}
+            >
+              <MonoLabel color={tab === "login" ? colors.ink : colors.textDim}>
+                SIGN IN
+              </MonoLabel>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, tab === "signup" && styles.tabActive]}
+              onPress={() => {
+                setTab("signup");
+                setError(null);
+              }}
+            >
+              <MonoLabel color={tab === "signup" ? colors.ink : colors.textDim}>
+                REGISTER
+              </MonoLabel>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.helper}>
+            {tab === "login" ? "Sign in to continue." : "Create your account."}
+          </Text>
+
+          {error && <Text style={styles.errorBanner}>{error}</Text>}
+
+          {tab === "signup" && (
+            <>
+              <MonoLabel color={colors.textDim} style={styles.fieldLabel}>
+                NAME
+              </MonoLabel>
+              <TextInput
+                style={styles.input}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Your name"
+                placeholderTextColor={colors.textDim}
+                autoCapitalize="words"
+              />
+            </>
+          )}
+
+          <MonoLabel color={colors.textDim} style={styles.fieldLabel}>
+            EMAIL
+          </MonoLabel>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@university.edu"
+            placeholderTextColor={colors.textDim}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <MonoLabel color={colors.textDim} style={styles.fieldLabel}>
+            PASSWORD
+          </MonoLabel>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            placeholderTextColor={colors.textDim}
+            secureTextEntry
+          />
+
           <TouchableOpacity
-            style={[styles.tab, tab === "login" && styles.tabActive]}
-            onPress={() => setTab("login")}
+            style={[styles.primaryBtn, isLoading && styles.btnDisabled]}
+            onPress={() => void handleSubmit()}
+            disabled={isLoading}
+            activeOpacity={0.85}
           >
-            <Text style={[styles.tabText, tab === "login" && styles.tabTextActive]}>
-              Log in
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, tab === "signup" && styles.tabActive]}
-            onPress={() => setTab("signup")}
-          >
-            <Text style={[styles.tabText, tab === "signup" && styles.tabTextActive]}>
-              Sign up
-            </Text>
+            <MonoLabel color={colors.paper}>
+              {isLoading ? "SIGNING IN…" : tab === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
+            </MonoLabel>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.cardTitle}>
-          {tab === "login" ? "Welcome back" : "Create your account"}
-        </Text>
-        <Text style={styles.cardSubtitle}>
-          {tab === "login"
-            ? "Pick up right where you left off."
-            : "Free for students. No card needed."}
-        </Text>
-
-        {tab === "signup" && (
-          <>
-            <Text style={styles.inputLabel}>Full name</Text>
-            <TextInput
-              style={styles.input}
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Ada Lovelace"
-              placeholderTextColor={colors.text3}
-            />
-          </>
-        )}
-
-        <Text style={styles.inputLabel}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@university.edu"
-          placeholderTextColor={colors.text3}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.inputLabel}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="••••••••"
-          placeholderTextColor={colors.text3}
-          secureTextEntry
-        />
-
-        <AuraButton
-          title={tab === "login" ? "Log in" : "Create account"}
-          onPress={handleSubmit}
-          variant="primary"
-          style={styles.submitBtn}
-        />
-
-        <AuraButton
-          title="⚡ Quick Demo Mode Login"
-          onPress={handleSubmit}
-          variant="secondary"
-          size="sm"
-          style={styles.demoBtn}
-        />
-      </View>
-    </ScrollView>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate("Register")}
+          style={styles.switchAuthBtn}
+        >
+          <Text style={styles.switchAuthText}>
+            {tab === "login" ? "Don't have an account? " : "Already have an account? "}
+            <Text style={styles.switchAuthHighlight}>
+              {tab === "login" ? "Create one" : "Sign in"}
+            </Text>
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: colors.bg,
-    alignItems: "center",
+    backgroundColor: colors.background,
     justifyContent: "center",
-    padding: 24,
+    padding: s.xxl,
   },
-  orb: {
-    marginBottom: 12,
+  headline: {
+    marginTop: s.lg,
+    marginBottom: s.huge,
+    lineHeight: 44,
+    letterSpacing: -0.5,
   },
-  brandTitle: {
-    color: colors.text1,
-    fontSize: 26,
-    fontWeight: "700",
-    letterSpacing: 3,
-    marginBottom: 24,
-  },
-  card: {
+  formBlock: {
     width: "100%",
     maxWidth: 380,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.lg,
-    padding: 24,
   },
   tabsRow: {
     flexDirection: "row",
-    backgroundColor: colors.surface2,
-    borderRadius: radii.sm,
-    padding: 3,
-    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: s.lg,
   },
   tab: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    borderRadius: radii.xs,
+    paddingBottom: 10,
+    marginRight: s.xl,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
   tabActive: {
-    backgroundColor: colors.surface,
+    borderBottomColor: colors.coral,
   },
-  tabText: {
-    color: colors.text2,
-    fontSize: 13,
-    fontWeight: "600",
+  helper: {
+    color: colors.textMuted,
+    fontSize: 13.5,
+    marginBottom: s.xl,
   },
-  tabTextActive: {
-    color: colors.text1,
+  errorBanner: {
+    color: colors.error,
+    backgroundColor: colors.errorSoft,
+    borderColor: colors.error,
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: 10,
+    fontSize: 12.5,
+    marginBottom: s.md,
   },
-  cardTitle: {
-    color: colors.text1,
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    color: colors.text3,
-    fontSize: 13,
-    marginBottom: 20,
-  },
-  inputLabel: {
-    color: colors.text2,
-    fontSize: 11.5,
-    fontWeight: "600",
+  fieldLabel: {
     marginBottom: 6,
   },
   input: {
-    backgroundColor: colors.surface2,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.sm,
+    backgroundColor: "transparent",
+    borderColor: colors.borderLight,
+    borderBottomWidth: 1,
+    borderWidth: 0,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderRadius: 0,
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    color: colors.text1,
-    fontSize: 14,
-    marginBottom: 14,
+    paddingHorizontal: 0,
+    color: colors.ink,
+    fontSize: 16,
+    marginBottom: s.lg,
   },
-  submitBtn: {
-    marginTop: 8,
-    marginBottom: 12,
+  primaryBtn: {
+    backgroundColor: colors.ink,
+    borderRadius: radii.sm,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: s.md,
   },
-  demoBtn: {
-    borderColor: colors.accent,
+  btnDisabled: {
+    opacity: 0.45,
+  },
+  switchAuthBtn: {
+    alignItems: "center",
+    paddingVertical: s.xl,
+  },
+  switchAuthText: {
+    color: colors.textDim,
+    fontSize: 13.5,
+  },
+  switchAuthHighlight: {
+    color: colors.ink,
+    fontWeight: "600",
   },
 });

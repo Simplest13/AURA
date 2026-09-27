@@ -1,15 +1,21 @@
+/**
+ * DeviceCard — restrained device status block for Home.
+ * Small watch icon, factual metrics row, quiet actions.
+ */
+
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, StyleProp } from "react-native";
-import { colors, radii, shadows } from "../theme/tokens";
-import { GlassCard } from "./GlassCard";
-import { StatusIndicator } from "./StatusIndicator";
+import { View, Text, StyleSheet, TouchableOpacity, StyleProp } from "react-native";
+import { colors } from "../theme/colors";
+import { radii } from "../theme/spacing";
+import { Card } from "./Card";
+import { Icon } from "./Icon";
 import { useDeviceStore } from "../stores/deviceStore";
 import { ConnectionState } from "../types/device";
 
 interface DeviceCardProps {
   onSimulatePress?: () => void;
   onManagePress?: () => void;
-  style?: StyleProp<ViewStyle>;
+  style?: StyleProp<any>;
 }
 
 export const DeviceCard: React.FC<DeviceCardProps> = ({
@@ -21,81 +27,63 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
   const isConnected = connectionState === ConnectionState.CONNECTED;
 
-  const handleSimulate = () => {
-    simulateButtonPress();
-    onSimulatePress?.();
-  };
-
   const getSignalLabel = (rssi: number | null) => {
-    if (!rssi) return "Excellent (-58 dBm)";
-    if (rssi > -60) return "Excellent";
+    if (!rssi) return "Good";
+    if (rssi > -60) return "Strong";
     if (rssi > -75) return "Good";
     return "Weak";
   };
 
   return (
-    <GlassCard style={[styles.card, style]}>
+    <Card style={[styles.card, style as any]}>
       <View style={styles.header}>
         <View style={styles.deviceInfo}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.iconText}>⊚</Text>
-          </View>
-          <View>
-            <Text style={styles.deviceName}>AURA Wearable</Text>
-            <Text style={styles.firmware}>Firmware v3.0.8 (Omi GATT Compatible)</Text>
-          </View>
+          <Icon name="watch" size={18} color={colors.textMuted} />
+          <Text style={styles.deviceName}>AURA One</Text>
         </View>
 
-        <StatusIndicator
-          label={isConnected ? "Connected" : connectionState}
-          status={isConnected ? "success" : connectionState === ConnectionState.ERROR ? "error" : "warning"}
-        />
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Battery</Text>
-          <Text style={styles.statValue}>
-            {batteryLevel !== null ? `${batteryLevel}%` : "--"}
-          </Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Signal</Text>
-          <Text style={styles.statValue}>{getSignalLabel(signalStrength)}</Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Mode</Text>
-          <Text style={styles.statValue}>Virtual BLE</Text>
+        <View style={styles.statusRow}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: isConnected ? colors.success : colors.warning },
+            ]}
+          />
+          <Text style={styles.statusText}>{isConnected ? "Connected" : "Offline"}</Text>
         </View>
       </View>
 
-      {/* Button Simulation & Manage Controls */}
+      <View style={styles.metricsRow}>
+        <Text style={styles.metric}>
+          Battery <Text style={styles.metricValue}>{batteryLevel !== null ? `${batteryLevel}%` : "—"}</Text>
+        </Text>
+        <Text style={styles.metric}>
+          Signal <Text style={styles.metricValue}>{getSignalLabel(signalStrength)}</Text>
+        </Text>
+        <Text style={styles.metric}>
+          Mode <Text style={styles.metricValue}>Virtual</Text>
+        </Text>
+      </View>
+
       <View style={styles.actionsRow}>
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={handleSimulate}
+          onPress={() => {
+            simulateButtonPress();
+            onSimulatePress?.();
+          }}
           style={styles.simulateBtn}
         >
-          <Text style={styles.simulateBtnText}>◉ Simulate Button Press</Text>
+          <Text style={styles.simulateBtnText}>Simulate button press</Text>
         </TouchableOpacity>
 
         {onManagePress && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={onManagePress}
-            style={styles.manageBtn}
-          >
-            <Text style={styles.manageBtnText}>Manage →</Text>
+          <TouchableOpacity activeOpacity={0.7} onPress={onManagePress} style={styles.manageBtn}>
+            <Text style={styles.manageBtnText}>Manage</Text>
           </TouchableOpacity>
         )}
       </View>
-    </GlassCard>
+    </Card>
   );
 };
 
@@ -107,92 +95,74 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   deviceInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-  },
-  iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  iconText: {
-    fontSize: 18,
-    color: colors.accent,
+    gap: 8,
   },
   deviceName: {
-    color: colors.text1,
-    fontSize: 15,
+    color: colors.text,
+    fontSize: 14.5,
     fontWeight: "600",
   },
-  firmware: {
-    color: colors.text3,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  statsRow: {
+  statusRow: {
     flexDirection: "row",
-    backgroundColor: colors.surface2,
-    borderRadius: radii.sm,
-    padding: 12,
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
+    gap: 5,
   },
-  statBox: {
-    flex: 1,
-    alignItems: "center",
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  divider: {
-    width: 1,
-    height: 24,
-    backgroundColor: colors.border,
+  statusText: {
+    color: colors.textMuted,
+    fontSize: 12,
   },
-  statLabel: {
-    color: colors.text3,
-    fontSize: 11,
-    marginBottom: 4,
+  metricsRow: {
+    flexDirection: "row",
+    gap: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: 12,
   },
-  statValue: {
-    color: colors.text1,
-    fontSize: 13,
-    fontWeight: "600",
+  metric: {
+    color: colors.textDim,
+    fontSize: 12,
+  },
+  metricValue: {
+    color: colors.text,
+    fontWeight: "500",
   },
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   simulateBtn: {
     flex: 1,
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radii.sm,
-    paddingVertical: 10,
+    borderRadius: radii.md,
+    paddingVertical: 9,
     alignItems: "center",
     justifyContent: "center",
   },
   simulateBtnText: {
-    color: colors.accent,
+    color: colors.text,
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   manageBtn: {
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 12,
   },
   manageBtnText: {
-    color: colors.text2,
+    color: colors.textMuted,
     fontSize: 13,
-    fontWeight: "500",
   },
 });

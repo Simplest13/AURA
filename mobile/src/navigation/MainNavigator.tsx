@@ -35,6 +35,9 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen name="Reminders" component={RemindersScreen} />
       <Stack.Screen name="Lectures" component={LectureRecorderScreen} />
       <Stack.Screen name="Pdf" component={PdfSummarizerScreen} />
+      {/* Aliases: any code (or stale bundle) navigating to the old names still resolves */}
+      <Stack.Screen name="LectureRecorder" component={LectureRecorderScreen} />
+      <Stack.Screen name="PdfSummarizer" component={PdfSummarizerScreen} />
       <Stack.Screen name="StudyPlanner" component={StudyPlannerScreen} />
     </Stack.Navigator>
   );

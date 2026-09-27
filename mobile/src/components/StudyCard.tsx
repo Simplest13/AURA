@@ -1,11 +1,16 @@
+/**
+ * StudyCard — quiet navigation row with Feather icon and count.
+ */
+
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { colors } from "../theme/colors";
+import { Icon, IconName } from "./Icon";
 
 interface StudyCardProps {
   title: string;
   subtitle: string;
-  icon: string;
+  icon: IconName;
   badge?: string;
   onPress: () => void;
   style?: ViewStyle;
@@ -20,82 +25,46 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   style,
 }) => {
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={onPress}
-      style={[styles.card, style]}
-    >
-      <View style={styles.topRow}>
-        <View style={styles.iconCircle}>
-          <Text style={styles.iconText}>{icon}</Text>
-        </View>
-        {badge && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge}</Text>
-          </View>
-        )}
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={[styles.row, style]}>
+      <Icon name={icon} size={18} color={colors.textMuted} />
+
+      <View style={styles.content}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {subtitle}
+        </Text>
       </View>
 
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle} numberOfLines={2}>
-        {subtitle}
-      </Text>
+      {badge ? <Text style={styles.badge}>{badge}</Text> : null}
+      <Icon name="chevron-right" size={16} color={colors.textDim} />
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    padding: 16,
-    flex: 1,
-    minHeight: 120,
-    justifyContent: "space-between",
-  },
-  topRow: {
+  row: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    gap: 12,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  iconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconText: {
-    fontSize: 16,
-  },
-  badge: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: radii.full,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  badgeText: {
-    color: colors.accent,
-    fontSize: 10,
-    fontWeight: "600",
+  content: {
+    flex: 1,
   },
   title: {
-    color: colors.text1,
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
+    color: colors.text,
+    fontSize: 14.5,
+    fontWeight: "500",
   },
   subtitle: {
-    color: colors.text3,
-    fontSize: 11.5,
-    lineHeight: 16,
+    color: colors.textDim,
+    fontSize: 12.5,
+    marginTop: 1,
+  },
+  badge: {
+    color: colors.textDim,
+    fontSize: 12,
   },
 });

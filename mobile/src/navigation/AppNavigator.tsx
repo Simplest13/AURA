@@ -1,6 +1,11 @@
 /**
  * AppNavigator - AURA Mobile
- * Root application navigator coordinating Splash, Auth, and Main flows.
+ * Root gate: decides between Splash (session restore ONLY), Auth, and Main flows.
+ *
+ * The splash is rendered conditionally while `hydrate()` restores the session —
+ * it is NOT a stack screen the app can get stuck on. When restore finishes (or
+ * a safety timeout fires), the gate switches and the splash unmounts. Logout
+ * flips `isAuthenticated` to false, which remounts the AuthNavigator directly.
  */
 
 import React from "react";
@@ -10,6 +15,7 @@ import { SplashScreen } from "../screens/SplashScreen";
 import { AuthNavigator } from "./AuthNavigator";
 import { MainNavigator } from "./MainNavigator";
 import { useAuthStore } from "../stores/authStore";
+import { ApiClient } from "../services/api/ApiClient";
 import { colors } from "../theme/colors";
 
 const Stack = createNativeStackNavigator();
@@ -29,19 +35,44 @@ const auraTheme = {
 };
 
 export const AppNavigator: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, hydrated, hydrate } = useAuthStore();
+  // Safety net: if restore hangs (broken storage, stuck I/O), leave the splash
+  // after 8s regardless — an infinite splash is never an acceptable state.
+  const [restoreTimedOut, setRestoreTimedOut] = React.useState(false);
+
+  React.useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  // After a session is restored from storage, validate it against the backend.
+  // A stale/expired token triggers logout → the gate below flips to Login
+  // instead of letting the app run on a dead session.
+  React.useEffect(() => {
+    if (hydrated && isAuthenticated) {
+      void ApiClient.validateSession();
+    }
+  }, [hydrated, isAuthenticated]);
+
+  React.useEffect(() => {
+    if (hydrated) return;
+    const timer = setTimeout(() => setRestoreTimedOut(true), 8000);
+    return () => clearTimeout(timer);
+  }, [hydrated]);
+
+  // Splash ONLY while determining session state
+  if (!hydrated && !restoreTimedOut) {
+    return <SplashScreen />;
+  }
 
   return (
     <NavigationContainer theme={auraTheme}>
       <Stack.Navigator
-        initialRouteName="Splash"
         screenOptions={{
           headerShown: false,
           animation: "fade",
           contentStyle: { backgroundColor: colors.background },
         }}
       >
-        <Stack.Screen name="Splash" component={SplashScreen} />
         {isAuthenticated ? (
           <Stack.Screen name="MainTabs" component={MainNavigator} />
         ) : (
@@ -51,4 +82,3 @@ export const AppNavigator: React.FC = () => {
     </NavigationContainer>
   );
 };
-

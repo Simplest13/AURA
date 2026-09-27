@@ -1,30 +1,22 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { colors } from "../theme/tokens";
+import { colors } from "../theme/colors";
 import { AuraOrb } from "../components/AuraOrb";
-import { useAuthStore } from "../stores/authStore";
+import { MonoLabel } from "../components/Typography";
 
-export const SplashScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { isAuthenticated } = useAuthStore();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isAuthenticated) {
-        navigation.replace("MainTabs");
-      } else {
-        navigation.replace("Onboarding");
-      }
-    }, 1800);
-
-    return () => clearTimeout(timer);
-  }, [isAuthenticated, navigation]);
-
+/**
+ * Pure display splash. Shown by AppNavigator ONLY while the persisted session
+ * is being restored. It holds no navigation logic and cannot become a stuck
+ * state — restoreSession always resolves (or the safety timeout fires).
+ */
+export const SplashScreen: React.FC = () => {
   return (
     <View style={styles.container}>
-      <AuraOrb state="thinking" size={140} />
-      <Text style={styles.brandTitle}>AURA</Text>
-      <Text style={styles.tagline}>Intelligent Wearable Assistant</Text>
-      <Text style={styles.footnote}>Connecting second brain...</Text>
+      <AuraOrb state="idle" size={64} />
+      <MonoLabel color={colors.ink} style={{ marginTop: 32, fontSize: 13, letterSpacing: 6 }}>
+        AURA
+      </MonoLabel>
+      <Text style={styles.footnote}>Restoring your session…</Text>
     </View>
   );
 };
@@ -32,27 +24,14 @@ export const SplashScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
   },
-  brandTitle: {
-    color: colors.text1,
-    fontSize: 32,
-    fontWeight: "700",
-    letterSpacing: 4,
-    marginTop: 32,
-  },
-  tagline: {
-    color: colors.accent2,
-    fontSize: 14,
-    fontWeight: "500",
-    marginTop: 8,
-  },
   footnote: {
-    color: colors.text3,
-    fontSize: 12,
-    marginTop: 48,
+    color: colors.textDim,
+    fontSize: 12.5,
+    marginTop: 12,
   },
 });

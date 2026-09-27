@@ -1,3 +1,8 @@
+/**
+ * DeviceScreen — the wearable as a physical product sheet.
+ * Mono technical labels, hairline metric rows, quiet actions.
+ */
+
 import React from "react";
 import {
   View,
@@ -5,18 +10,22 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Platform,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing as s, radii } from "../theme/spacing";
+import { useLayout } from "../theme/responsive";
 import { Header } from "../components/Header";
-import { GlassCard } from "../components/GlassCard";
-import { StatusIndicator } from "../components/StatusIndicator";
+import { Icon } from "../components/Icon";
 import { AuraButton } from "../components/AuraButton";
+import { SerifText, MonoLabel } from "../components/Typography";
 import { useDeviceStore } from "../stores/deviceStore";
 import { ConnectionState, OMI_PROTOCOL, STANDARD_BLE } from "../types/device";
 
 export const DeviceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
+  const { contentMaxWidth, gutter } = useLayout();
   const {
     connectionState,
     currentDevice,
@@ -33,173 +42,149 @@ export const DeviceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isConnected = connectionState === ConnectionState.CONNECTED;
   const isScanning = connectionState === ConnectionState.SCANNING;
 
-  const handleSimulate = () => {
-    simulateButtonPress();
-    navigation.navigate("Voice");
-  };
-
   return (
     <View style={styles.container}>
-      <Header
-        title="Wearable Device"
-        subtitle="Hardware Connection & BLE Protocol"
-        showBack={true}
-        onBack={() => navigation.goBack()}
-      />
+      <View style={{ maxWidth: contentMaxWidth, width: "100%", alignSelf: "center" }}>
+        <Header
+          title="Device"
+          showBack={true}
+          onBack={() => navigation.goBack()}
+          showDeviceBadge={false}
+        />
+      </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Device Status Card */}
-        <GlassCard style={styles.mainCard} glow={isConnected}>
-          <View style={styles.cardTop}>
-            <View style={styles.iconCircle}>
-              <Text style={styles.deviceIcon}>⊚</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.deviceName}>
-                {currentDevice?.name || "AURA Wearable Pendant"}
-              </Text>
-              <Text style={styles.deviceId}>
-                ID: {currentDevice?.id || "AURA-VIRTUAL-01"}
-              </Text>
-            </View>
-            <StatusIndicator
-              label={isConnected ? "Connected" : connectionState}
-              status={isConnected ? "success" : "warning"}
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: gutter,
+            maxWidth: contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+            paddingBottom: 60 + insets.bottom,
+          },
+        ]}
+      >
+        <MonoLabel color={colors.textDim}>WEARABLE</MonoLabel>
+
+        {/* Identity */}
+        <View style={styles.identityRow}>
+          <SerifText size={30}>AURA One</SerifText>
+          <View style={styles.statusChip}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: isConnected ? colors.olive : colors.yellow },
+              ]}
             />
+            <MonoLabel color={colors.textMuted}>
+              {isConnected ? "CONNECTED" : String(connectionState).toUpperCase()}
+            </MonoLabel>
           </View>
+        </View>
 
-          {/* Metrics Row */}
-          <View style={styles.metricsRow}>
-            <View style={styles.metric}>
-              <Text style={styles.metricLabel}>BATTERY</Text>
-              <Text style={styles.metricValue}>
-                {batteryLevel !== null ? `${batteryLevel}%` : "--"}
-              </Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metric}>
-              <Text style={styles.metricLabel}>SIGNAL (RSSI)</Text>
-              <Text style={styles.metricValue}>
-                {signalStrength ? `${signalStrength} dBm` : "Excellent"}
-              </Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metric}>
-              <Text style={styles.metricLabel}>FIRMWARE</Text>
-              <Text style={styles.metricValue}>
-                v{firmwareVersion || "3.0.8"}
-              </Text>
-            </View>
+        <MonoLabel color={colors.textDim}>ID · {currentDevice?.id || "AURA-VIRTUAL-01"}</MonoLabel>
+
+        {/* Metrics */}
+        <View style={styles.metricsBlock}>
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Battery</Text>
+            <Text style={styles.metricValue}>
+              {batteryLevel !== null ? `${batteryLevel}%` : "—"}
+            </Text>
           </View>
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Connection</Text>
+            <Text style={styles.metricValue}>
+              {signalStrength
+                ? signalStrength > -60
+                  ? "Strong"
+                  : signalStrength > -75
+                  ? "Good"
+                  : "Weak"
+                : "Good"}
+            </Text>
+          </View>
+          <View style={styles.metricRowLast}>
+            <Text style={styles.metricLabel}>Firmware</Text>
+            <Text style={styles.metricValue}>{firmwareVersion || "3.0.8"}</Text>
+          </View>
+        </View>
 
-          {/* Action Buttons */}
-          <View style={styles.buttonStack}>
+        {/* Actions */}
+        <View style={styles.actionsStack}>
+          <AuraButton
+            title="Simulate button press"
+            variant="primary"
+            size="md"
+            onPress={() => {
+              simulateButtonPress();
+              navigation.navigate("Voice");
+            }}
+          />
+          {isConnected ? (
             <AuraButton
-              title="◉ Simulate Wearable Button Press"
-              variant="primary"
+              title="Disconnect"
+              variant="secondary"
               size="md"
-              onPress={handleSimulate}
-              style={{ marginBottom: 10 }}
+              onPress={disconnect}
+              style={{ marginTop: s.sm }}
             />
+          ) : (
+            <AuraButton
+              title={isScanning ? "Scanning…" : "Scan for devices"}
+              variant="secondary"
+              size="md"
+              loading={isScanning}
+              onPress={scanForDevices}
+              style={{ marginTop: s.sm }}
+            />
+          )}
+        </View>
 
-            {isConnected ? (
-              <AuraButton
-                title="Disconnect Wearable"
-                variant="secondary"
-                size="md"
-                onPress={disconnect}
-              />
-            ) : (
-              <AuraButton
-                title={isScanning ? "Scanning..." : "Scan for Wearable Devices"}
-                variant="primary"
-                size="md"
-                loading={isScanning}
-                onPress={scanForDevices}
-              />
-            )}
-          </View>
-        </GlassCard>
-
-        {/* Discovered BLE Peripherals Section */}
-        <Text style={styles.sectionTitle}>DISCOVERED BLE DEVICES</Text>
-        {discoveredDevices.length === 0 ? (
-          <GlassCard style={styles.emptyCard} variant="surface2">
-            {isScanning ? (
-              <View style={{ alignItems: "center", paddingVertical: 12 }}>
-                <ActivityIndicator color={colors.accent} size="small" />
-                <Text style={styles.scanningText}>
-                  Scanning 2.4GHz BLE advertisement packets...
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.emptyText}>
-                No other devices in range. Tap "Scan for Wearable Devices" to search.
-              </Text>
-            )}
-          </GlassCard>
-        ) : (
-          discoveredDevices.map((d) => (
-            <TouchableOpacity
-              key={d.id}
-              style={styles.deviceItem}
-              onPress={() => connectToDevice(d.id)}
-            >
-              <View style={styles.deviceItemIcon}>
-                <Text>⊚</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.deviceItemName}>{d.name}</Text>
-                <Text style={styles.deviceItemSub}>
-                  {d.id} · RSSI: {d.rssi} dBm
-                </Text>
-              </View>
-              <AuraButton
-                title="Connect"
-                size="sm"
-                variant="secondary"
+        {/* Nearby */}
+        {discoveredDevices.length > 0 && (
+          <>
+            <MonoLabel color={colors.textDim} style={{ marginTop: s.xxl }}>
+              NEARBY DEVICES
+            </MonoLabel>
+            {discoveredDevices.map((d) => (
+              <TouchableOpacity
+                key={d.id}
+                style={styles.nearbyRow}
                 onPress={() => connectToDevice(d.id)}
-              />
-            </TouchableOpacity>
-          ))
+              >
+                <Icon name="bluetooth" size={15} color={colors.textMuted} />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.nearbyName}>{d.name}</Text>
+                  <Text style={styles.nearbyMeta}>RSSI {d.rssi} dBm</Text>
+                </View>
+                <MonoLabel color={colors.blue}>CONNECT →</MonoLabel>
+              </TouchableOpacity>
+            ))}
+          </>
         )}
 
-        {/* Hardware & GATT Protocol Details */}
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
-          GATT SERVICE PROTOCOL SPECIFICATION
+        {/* Protocol */}
+        <MonoLabel color={colors.textDim} style={{ marginTop: s.xxl }}>
+          BLUETOOTH PROTOCOL
+        </MonoLabel>
+        <Text style={styles.protocolNote}>
+          Compatible with the Omi firmware reference (MIT licensed).
         </Text>
-        <GlassCard style={styles.protocolCard} variant="surface2">
-          <Text style={styles.protocolText}>
-            Adapted from Omi firmware reference architecture (MIT Licensed):
-          </Text>
-
-          <View style={styles.gattRow}>
-            <Text style={styles.gattName}>Main Service UUID:</Text>
-            <Text style={styles.gattUuid}>{OMI_PROTOCOL.MAIN_SERVICE_UUID}</Text>
+        {[
+          ["Main service", OMI_PROTOCOL.MAIN_SERVICE_UUID],
+          ["Button trigger", OMI_PROTOCOL.BUTTON_TRIGGER_CHARACTERISTIC_UUID],
+          ["Battery service", STANDARD_BLE.BATTERY_SERVICE_UUID],
+          ["Audio stream", OMI_PROTOCOL.AUDIO_DATA_STREAM_CHARACTERISTIC_UUID],
+        ].map(([label, uuid]) => (
+          <View key={label} style={styles.gattRow}>
+            <Text style={styles.gattName}>{label}</Text>
+            <Text style={styles.gattUuid} numberOfLines={1}>
+              {uuid}
+            </Text>
           </View>
-
-          <View style={styles.gattRow}>
-            <Text style={styles.gattName}>Button Trigger Characteristic:</Text>
-            <Text style={styles.gattUuid}>{OMI_PROTOCOL.BUTTON_TRIGGER_CHARACTERISTIC_UUID}</Text>
-          </View>
-
-          <View style={styles.gattRow}>
-            <Text style={styles.gattName}>Standard Battery Service:</Text>
-            <Text style={styles.gattUuid}>{STANDARD_BLE.BATTERY_SERVICE_UUID}</Text>
-          </View>
-
-          <View style={styles.gattRow}>
-            <Text style={styles.gattName}>Battery Level Characteristic:</Text>
-            <Text style={styles.gattUuid}>{STANDARD_BLE.BATTERY_LEVEL_CHARACTERISTIC_UUID}</Text>
-          </View>
-
-          <View style={styles.gattRow}>
-            <Text style={styles.gattName}>Audio Stream Characteristic:</Text>
-            <Text style={styles.gattUuid}>{OMI_PROTOCOL.AUDIO_DATA_STREAM_CHARACTERISTIC_UUID}</Text>
-          </View>
-        </GlassCard>
-
-        <View style={{ height: 80 }} />
+        ))}
       </ScrollView>
     </View>
   );
@@ -208,150 +193,100 @@ export const DeviceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: s.xl,
   },
-  mainCard: {
-    padding: 18,
-    marginBottom: 20,
-  },
-  cardTop: {
+  identityRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
+    justifyContent: "space-between",
+    marginTop: s.sm,
+    marginBottom: 8,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface2,
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderWidth: 1,
-    borderColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  deviceIcon: {
-    color: colors.accent,
-    fontSize: 22,
-  },
-  deviceName: {
-    color: colors.text1,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  deviceId: {
-    color: colors.text3,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  metricsRow: {
-    flexDirection: "row",
-    backgroundColor: colors.surface2,
+    borderColor: colors.border,
     borderRadius: radii.sm,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginBottom: 18,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: colors.surfaceElevated,
   },
-  metric: {
-    flex: 1,
-    alignItems: "center",
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  metricDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: colors.border,
+  metricsBlock: {
+    marginTop: s.xxl,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  metricRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  metricRowLast: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 13,
   },
   metricLabel: {
-    color: colors.text3,
-    fontSize: 9.5,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    color: colors.textDim,
+    fontSize: 14,
   },
   metricValue: {
-    color: colors.text1,
-    fontSize: 13,
-    fontWeight: "600",
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
   },
-  buttonStack: {
-    width: "100%",
+  actionsStack: {
+    marginTop: s.xxl,
   },
-  sectionTitle: {
-    color: colors.text3,
-    fontSize: 10.5,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 10,
-    paddingHorizontal: 4,
-  },
-  emptyCard: {
-    padding: 16,
-    alignItems: "center",
-  },
-  emptyText: {
-    color: colors.text3,
-    fontSize: 12,
-    textAlign: "center",
-  },
-  scanningText: {
-    color: colors.accent,
-    fontSize: 12,
-    marginTop: 8,
-  },
-  deviceItem: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 12,
+  nearbyRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  deviceItemIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surface2,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
+  nearbyName: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: "500",
   },
-  deviceItemName: {
-    color: colors.text1,
-    fontSize: 13.5,
-    fontWeight: "600",
+  nearbyMeta: {
+    color: colors.textDim,
+    fontSize: 12,
+    marginTop: 1,
   },
-  deviceItemSub: {
-    color: colors.text3,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  protocolCard: {
-    padding: 14,
-  },
-  protocolText: {
-    color: colors.text2,
-    fontSize: 11.5,
-    lineHeight: 16,
-    marginBottom: 12,
+  protocolNote: {
+    color: colors.textDim,
+    fontSize: 12.5,
+    marginTop: 6,
+    marginBottom: s.sm,
   },
   gattRow: {
-    marginBottom: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   gattName: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: "600",
+    color: colors.textMuted,
+    fontSize: 12.5,
   },
   gattUuid: {
-    color: colors.text3,
-    fontSize: 10,
-    fontFamily: Platform.OS === "android" ? "monospace" : "Menlo",
-    marginTop: 2,
+    color: colors.textDim,
+    fontSize: 11,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    marginTop: 3,
   },
 });

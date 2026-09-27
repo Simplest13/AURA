@@ -1,12 +1,12 @@
 /**
- * AuraOrb Component
- * Flagship visual identity representing the AURA AI core.
- * Features multi-layered animated glowing rings, pulse breathing, rotation,
- * and amplitude responsiveness.
+ * AuraOrb — AURA's physical signature.
+ * A small ink disc with a fine accent ring. It breathes when idle, leans into
+ * the mic when listening, turns slowly while thinking, pulses softly while
+ * speaking. An object, not a portal.
  */
 
 import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated, Easing, ViewStyle } from "react-native";
+import { View, StyleSheet, Animated, Easing, ViewStyle, Platform } from "react-native";
 import { colors } from "../theme/colors";
 import { VoiceState } from "../types/voice";
 
@@ -15,272 +15,159 @@ export type OrbState = VoiceState | "IDLE" | "LISTENING" | "THINKING" | "SPEAKIN
 interface AuraOrbProps {
   state: OrbState;
   size?: number;
-  amplitude?: number; // 0.0 to 1.0
+  amplitude?: number;
   style?: ViewStyle;
 }
 
-export const AuraOrb: React.FC<AuraOrbProps> = ({ state, size = 180, amplitude = 0, style }) => {
+export const AuraOrb: React.FC<AuraOrbProps> = ({ state, size = 88, amplitude = 0, style }) => {
   const normalizedState = (state || "idle").toString().toLowerCase() as VoiceState;
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0.6)).current;
-  const ampAnim = useRef(new Animated.Value(1)).current;
+  const ringAnim = useRef(new Animated.Value(0)).current;
 
-  // React to amplitude changes when listening or speaking
   useEffect(() => {
-    if (amplitude > 0) {
-      Animated.timing(ampAnim, {
-        toValue: 1 + amplitude * 0.35,
-        duration: 90,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(ampAnim, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
+    if ((normalizedState === "listening" || normalizedState === "speaking") && amplitude > 0) {
+      Animated.timing(scaleAnim, {
+        toValue: 1 + Math.min(amplitude, 1) * 0.05,
+        duration: 120,
+        useNativeDriver: Platform.OS !== "web",
       }).start();
     }
-  }, [amplitude]);
+  }, [amplitude, normalizedState]);
 
   useEffect(() => {
-    pulseAnim.stopAnimation();
+    scaleAnim.stopAnimation();
     rotateAnim.stopAnimation();
-    glowAnim.stopAnimation();
+    scaleAnim.setValue(1);
+    rotateAnim.setValue(0);
+    ringAnim.setValue(0);
+
+    const loop = (toValue: number, duration: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue,
+            duration,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: Platform.OS !== "web",
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: Platform.OS !== "web",
+          }),
+        ])
+      );
+
+    let anim: Animated.CompositeAnimation | undefined;
 
     if (normalizedState === "idle") {
-      // Slow breathing animation with subtle glow
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 2400,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0.97,
-            duration: 2400,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 0.7,
-            duration: 2400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0.4,
-            duration: 2400,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
+      anim = loop(1.025, 3000);
     } else if (normalizedState === "listening") {
-      // Alert pulse with reactive coral glow
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.14,
-            duration: 650,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0.95,
-            duration: 650,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.timing(glowAnim, {
-        toValue: 0.95,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      anim = loop(1.06, 1000);
+      // accent ring fades in
+      Animated.timing(ringAnim, { toValue: 1, duration: 300, useNativeDriver: false }).start();
     } else if (normalizedState === "thinking") {
-      // Continuous rotational energy and deep violet glow
       Animated.loop(
         Animated.timing(rotateAnim, {
           toValue: 1,
-          duration: 2500,
+          duration: 5000,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         })
       ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.08,
-            duration: 850,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0.93,
-            duration: 850,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
     } else if (normalizedState === "speaking") {
-      // Expanding speech waves in cyan
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.22,
-            duration: 400,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0.98,
-            duration: 400,
-            easing: Easing.in(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.timing(glowAnim, {
-        toValue: 0.9,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    } else if (normalizedState === "error") {
-      pulseAnim.setValue(1);
-      glowAnim.setValue(0.9);
+      anim = loop(1.045, 750);
+      Animated.timing(ringAnim, { toValue: 1, duration: 300, useNativeDriver: false }).start();
     }
-  }, [normalizedState]);
+
+    anim?.start();
+    return () => anim?.stop();
+  }, [normalizedState, scaleAnim, rotateAnim, ringAnim]);
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
 
-  // State colors
-  let ringColor = colors.primary;
-  let centerColor = colors.secondary;
-  let shadowColor = colors.primary;
-
-  if (normalizedState === "listening") {
-    ringColor = colors.coral;
-    centerColor = colors.primary;
-    shadowColor = colors.coral;
-  } else if (normalizedState === "thinking") {
-    ringColor = colors.primaryLight;
-    centerColor = colors.secondary;
-    shadowColor = colors.primary;
-  } else if (normalizedState === "speaking") {
-    ringColor = colors.cyan;
-    centerColor = colors.primary;
-    shadowColor = colors.cyan;
-  } else if (normalizedState === "error") {
-    ringColor = colors.error;
-    centerColor = colors.error;
-    shadowColor = colors.error;
-  }
-
-  const innerSize = size * 0.62;
-  const coreSize = size * 0.32;
+  const isError = normalizedState === "error";
+  const ringColor = isError ? colors.error : colors.coral;
 
   return (
-    <View style={[{ width: size, height: size, alignItems: "center", justifyContent: "center" }, style]}>
-      {/* Outer Halo Glow */}
-      <Animated.View
+    <View
+      style={[
+        {
+          width: size,
+          height: size,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        style,
+      ]}
+    >
+      {/* Fine outer ring — hairline, editorial */}
+      <View
         style={[
-          styles.outerHalo,
+          StyleSheet.absoluteFill,
           {
-            width: size * 1.2,
-            height: size * 1.2,
-            borderRadius: (size * 1.2) / 2,
-            backgroundColor: ringColor,
-            opacity: glowAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.08, 0.35],
-            }),
-            transform: [{ scale: pulseAnim }, { scale: ampAnim }],
+            borderRadius: size / 2,
+            borderWidth: 1,
+            borderColor: colors.border,
           },
         ]}
       />
 
-      {/* Main Orbiting / Pulsing Ring */}
+      {/* Accent arc — appears while listening / speaking */}
       <Animated.View
         style={[
-          styles.ring,
+          StyleSheet.absoluteFill,
           {
-            width: size * 0.9,
-            height: size * 0.9,
-            borderRadius: (size * 0.9) / 2,
+            borderRadius: size / 2,
+            borderWidth: 1.5,
             borderColor: ringColor,
-            shadowColor: shadowColor,
-            transform: [{ scale: pulseAnim }, { rotate: spin }],
+            opacity: ringAnim,
+            transform: [{ rotate: spin }],
+          },
+        ]}
+      />
+
+      {/* Ink disc */}
+      <Animated.View
+        style={[
+          styles.disc,
+          {
+            width: size * 0.62,
+            height: size * 0.62,
+            borderRadius: (size * 0.62) / 2,
+            transform: [{ scale: scaleAnim }],
           },
         ]}
       >
-        {/* Inner Glass Sphere */}
+        {/* Inner point of focus */}
         <View
           style={[
-            styles.innerCircle,
+            styles.core,
             {
-              width: innerSize,
-              height: innerSize,
-              borderRadius: innerSize / 2,
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.borderLight,
+              width: size * 0.09,
+              height: size * 0.09,
+              borderRadius: size * 0.045,
+              backgroundColor: isError ? colors.error : colors.paper,
+              opacity: 0.85,
             },
           ]}
-        >
-          {/* Pulsing Core */}
-          <Animated.View
-            style={[
-              styles.core,
-              {
-                width: coreSize,
-                height: coreSize,
-                borderRadius: coreSize / 2,
-                backgroundColor: centerColor,
-                shadowColor: ringColor,
-                transform: [{ scale: ampAnim }],
-              },
-            ]}
-          />
-        </View>
+        />
       </Animated.View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  outerHalo: {
-    position: "absolute",
-  },
-  ring: {
-    borderWidth: 2.5,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  innerCircle: {
-    borderWidth: 1.5,
+  disc: {
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
-  core: {
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.85,
-    shadowRadius: 14,
-    elevation: 8,
-  },
+  core: {},
 });

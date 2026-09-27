@@ -1,54 +1,22 @@
 /**
- * AURA Design Tokens - Shadows & Elevation
+ * AURA Design Tokens — Shadows
+ * Editorial design uses almost no elevation. Shadows exist only for genuinely
+ * floating layers (modals). Everything else relies on borders and rules.
  */
 
 import { ViewStyle } from "react-native";
-import { colors } from "./colors";
 
 export const shadows: Record<string, ViewStyle> = {
-  sm: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  md: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.55,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  sm: {}, // flat — borders carry hierarchy
+  md: {},
   lg: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.65,
-    shadowRadius: 16,
-    elevation: 8,
+    boxShadow: "0px 12px 32px 0px rgba(23, 21, 28, 0.14)",
   },
-  glowPrimary: {
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  glowCyan: {
-    shadowColor: colors.cyan,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  glowCoral: {
-    shadowColor: colors.coral,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.85,
-    shadowRadius: 18,
-    elevation: 8,
-  },
+  // Kept for legacy call sites — intentionally flat now
+  glowPrimary: {},
+  glowCyan: {},
+  glowCoral: {},
+  glow: {},
 };
 
 export type Shadows = typeof shadows;
-

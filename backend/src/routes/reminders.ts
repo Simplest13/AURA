@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 const router = Router();
 
 // Create a new reminder
-router.post('/reminders', authenticate, async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId!;
   const { title, dueTime, tag } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
@@ -27,7 +27,7 @@ router.post('/reminders', authenticate, async (req, res) => {
 });
 
 // Get all reminders for user
-router.get('/reminders', authenticate, async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId!;
   try {
     const reminders = await db.getReminders(userId);
@@ -37,12 +37,13 @@ router.get('/reminders', authenticate, async (req, res) => {
   }
 });
 
-  // Update a reminder (e.g., mark completed)
-  router.put('/reminders/:id', authenticate, async (req, res) => {
+  // Update a reminder (e.g., mark completed) — scoped to the authenticated user
+  router.put('/:id', authenticate, async (req, res) => {
     const id = (req.params as any).id as string;
+    const userId = (req as AuthenticatedRequest).userId!;
     const updates = req.body;
     try {
-      const updated = await db.updateReminder(id, updates);
+      const updated = await db.updateReminder(id, userId, updates);
       if (!updated) return res.status(404).json({ error: 'Reminder not found' });
       res.json(updated);
     } catch (err: any) {
@@ -50,11 +51,13 @@ router.get('/reminders', authenticate, async (req, res) => {
     }
   });
 
-  // Delete a reminder
-  router.delete('/reminders/:id', authenticate, async (req, res) => {
+  // Delete a reminder — scoped to the authenticated user
+  router.delete('/:id', authenticate, async (req, res) => {
     const id = (req.params as any).id as string;
+    const userId = (req as AuthenticatedRequest).userId!;
     try {
-      await db.deleteReminder(id);
+      const deleted = await db.deleteReminder(id, userId);
+      if (!deleted) return res.status(404).json({ error: 'Reminder not found' });
       res.status(204).send();
     } catch (err: any) {
       res.status(err.status || 500).json({ error: err.message || 'Server error' });

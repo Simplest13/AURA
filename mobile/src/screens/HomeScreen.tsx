@@ -1,3 +1,9 @@
+/**
+ * HomeScreen — editorial canvas.
+ * Serif greeting, technical micro-labels, oversized numerals for Today,
+ * thin rules instead of cards, paper texture underneath.
+ */
+
 import React from "react";
 import {
   View,
@@ -6,281 +12,287 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing as s } from "../theme/spacing";
+import { useLayout } from "../theme/responsive";
 import { AuraOrb } from "../components/AuraOrb";
-import { DeviceCard } from "../components/DeviceCard";
-import { GlassCard } from "../components/GlassCard";
-import { ConversationCard } from "../components/ConversationCard";
-import { TaskCard } from "../components/TaskCard";
-import { ReminderCard } from "../components/ReminderCard";
-import { Header } from "../components/Header";
+import { PaperTexture } from "../components/PaperTexture";
+import { SerifText, MonoLabel } from "../components/Typography";
+import { Icon } from "../components/Icon";
 import { useAuthStore } from "../stores/authStore";
 import { useChatStore } from "../stores/chatStore";
 import { useStudyStore } from "../stores/studyStore";
 import { useVoiceStore } from "../stores/voiceStore";
+import { useDeviceStore } from "../stores/deviceStore";
+import { ConnectionState } from "../types/device";
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
+  const { gutter, contentMaxWidth } = useLayout();
   const { user } = useAuthStore();
   const { conversations, setActiveConversation } = useChatStore();
-  const { tasks, toggleTask, reminders, toggleReminder } = useStudyStore();
+  const { tasks, reminders, lectures } = useStudyStore();
   const { state: voiceState } = useVoiceStore();
+  const { connectionState, batteryLevel } = useDeviceStore();
 
-  const activeTasks = tasks.filter((t) => !t.completed).slice(0, 2);
-  const recentConvs = conversations.slice(0, 2);
-  const activeReminders = reminders.filter((r) => !r.completed).slice(0, 2);
+  const pendingReminders = reminders.filter((r) => !r.completed).length;
+  const openTasks = tasks.filter((t) => !t.completed).length;
+  const isConnected = connectionState === ConnectionState.CONNECTED;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return "Good morning,";
+    if (hour < 17) return "Good afternoon,";
+    return "Good evening,";
   };
+
+  const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   const handleOpenConversation = (id: string) => {
     setActiveConversation(id);
     navigation.navigate("Chat");
   };
 
+  const recentConvs = conversations.slice(0, 3);
+
+  const todayItems = [
+    { count: pendingReminders, label: pendingReminders === 1 ? "reminder" : "reminders", target: "Reminders", tint: colors.coral },
+    { count: lectures.length, label: lectures.length === 1 ? "lecture" : "lectures", target: "Lectures", tint: colors.blue },
+    { count: openTasks, label: openTasks === 1 ? "task" : "tasks", target: "StudyPlanner", tint: colors.olive },
+  ];
+
   return (
-    <View style={styles.screenContainer}>
-      <Header
-        title="AURA"
-        subtitle="Wearable AI Assistant"
-        onDeviceBadgePress={() => navigation.navigate("Device")}
-      />
+    <View style={styles.screen}>
+      <PaperTexture mode="overlay" />
 
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* Greeting */}
-        <View style={styles.greetingSection}>
-          <Text style={styles.greetingTitle}>
-            {getGreeting()}, {user?.name || "Shivam"}.
-          </Text>
-          <Text style={styles.greetingSubtitle}>
-            Here's what's active across your second brain.
-          </Text>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: gutter,
+            maxWidth: contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+            paddingBottom: 110 + insets.bottom,
+          },
+        ]}
+      >
+        {/* Masthead */}
+        <View style={styles.mastheadRow}>
+          <MonoLabel color={colors.ink}>AURA</MonoLabel>
+          <MonoLabel>{now}</MonoLabel>
         </View>
 
-        {/* Central AURA Orb & Quick Voice Trigger */}
-        <GlassCard style={styles.orbCard}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate("Voice")}
-            style={styles.orbTouchArea}
-          >
-            <AuraOrb state={voiceState} size={130} />
-            <View style={styles.orbTextContainer}>
-              <Text style={styles.orbPrompt}>Tap to talk with AURA</Text>
-              <Text style={styles.orbSubPrompt}>
-                Or press the button on your wearable
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </GlassCard>
+        {/* Greeting — serif, oversized */}
+        <View style={styles.greetingBlock}>
+          <SerifText size={34} style={styles.greeting}>
+            {getGreeting()}
+          </SerifText>
+          <SerifText size={34} italic style={styles.greetingName}>
+            {user?.name || "Student"}
+          </SerifText>
+          <Text style={styles.subGreeting}>Your day, at a glance.</Text>
+        </View>
 
-        {/* Wearable Connection & Battery Card */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>WEARABLE STATUS</Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Device")}>
-              <Text style={styles.seeAllText}>Manage</Text>
-            </TouchableOpacity>
-          </View>
-          <DeviceCard
-            onSimulatePress={() => navigation.navigate("Voice")}
-            onManagePress={() => navigation.navigate("Device")}
+        {/* Device line */}
+        <View style={styles.deviceRow}>
+          <View
+            style={[
+              styles.deviceDot,
+              { backgroundColor: isConnected ? colors.olive : colors.yellow },
+            ]}
           />
-        </View>
-
-        {/* Quick Tools Grid */}
-        <View style={styles.toolsRow}>
+          <MonoLabel>
+            {isConnected ? `AURA ONE · CONNECTED · ${batteryLevel}%` : "AURA ONE · OFFLINE"}
+          </MonoLabel>
           <TouchableOpacity
-            style={styles.toolBtn}
-            onPress={() => navigation.navigate("Voice")}
+            onPress={() => navigation.navigate("Device")}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginLeft: "auto" }}
           >
-            <Text style={styles.toolIcon}>◉</Text>
-            <Text style={styles.toolLabel}>Voice Cockpit</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.toolBtn}
-            onPress={() => navigation.navigate("Chat")}
-          >
-            <Text style={styles.toolIcon}>💬</Text>
-            <Text style={styles.toolLabel}>New Chat</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.toolBtn}
-            onPress={() => navigation.navigate("Study", { screen: "StudyPlanner" })}
-          >
-            <Text style={styles.toolIcon}>📚</Text>
-            <Text style={styles.toolLabel}>Planner</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.toolBtn}
-            onPress={() => navigation.navigate("Study", { screen: "LectureRecorder" })}
-          >
-            <Text style={styles.toolIcon}>🎙</Text>
-            <Text style={styles.toolLabel}>Lecture</Text>
+            <Icon name="chevron-right" size={15} color={colors.textDim} />
           </TouchableOpacity>
         </View>
 
-        {/* Today's Study Tasks */}
+        {/* Rule */}
+        <View style={styles.rule} />
+
+        {/* Voice section */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => navigation.navigate("Voice")}
+          style={styles.voiceSection}
+        >
+          <AuraOrb state={voiceState === "idle" ? "idle" : voiceState} size={84} />
+          <Text style={styles.readyText}>Ready when you are</Text>
+          <MonoLabel color={colors.ink}>TAP TO TALK</MonoLabel>
+        </TouchableOpacity>
+
+        <View style={styles.rule} />
+
+        {/* Today — oversized numerals */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>TODAY'S TASKS</Text>
+          <MonoLabel color={colors.textDim}>TODAY</MonoLabel>
+          {todayItems.map((item) => (
             <TouchableOpacity
-              onPress={() => navigation.navigate("Study", { screen: "StudyPlanner" })}
+              key={item.label}
+              style={styles.todayRow}
+              onPress={() => navigation.navigate(item.target)}
             >
-              <Text style={styles.seeAllText}>View all ({tasks.length})</Text>
+              <Text style={[styles.todayNumeral, { color: colors.ink }]}>
+                {String(item.count).padStart(2, "0")}
+              </Text>
+              <Text style={styles.todayLabel}>{item.label}</Text>
+              <View style={[styles.todayMarker, { backgroundColor: item.tint }]} />
+              <Icon name="chevron-right" size={14} color={colors.textDim} />
             </TouchableOpacity>
-          </View>
-          {activeTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onToggle={() => toggleTask(task.id)}
-            />
           ))}
         </View>
 
-        {/* Reminders */}
+        <View style={styles.rule} />
+
+        {/* Recent */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>REMINDERS</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate("Study", { screen: "Reminders" })}
-            >
-              <Text style={styles.seeAllText}>View all</Text>
-            </TouchableOpacity>
-          </View>
-          {activeReminders.map((rem) => (
-            <ReminderCard
-              key={rem.id}
-              reminder={rem}
-              onToggle={() => toggleReminder(rem.id)}
-            />
-          ))}
+          <MonoLabel color={colors.textDim}>RECENT</MonoLabel>
+          {recentConvs.length === 0 ? (
+            <Text style={styles.emptyText}>Nothing yet. Start a conversation.</Text>
+          ) : (
+            recentConvs.map((conv) => (
+              <TouchableOpacity
+                key={conv.id}
+                style={styles.convRow}
+                onPress={() => handleOpenConversation(conv.id)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.convTitle} numberOfLines={1}>
+                    {conv.title}
+                  </Text>
+                  <Text style={styles.convMeta}>
+                    {new Date(conv.updatedAt).toLocaleDateString([], {
+                      month: "short",
+                      day: "numeric",
+                    })}{" "}
+                    ·{" "}
+                    {new Date(conv.updatedAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={14} color={colors.textDim} />
+              </TouchableOpacity>
+            ))
+          )}
         </View>
-
-        {/* Recent Conversations */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>RECENT CHATS</Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Chat")}>
-              <Text style={styles.seeAllText}>All chats</Text>
-            </TouchableOpacity>
-          </View>
-          {recentConvs.map((conv) => (
-            <ConversationCard
-              key={conv.id}
-              conversation={conv}
-              onPress={() => handleOpenConversation(conv.id)}
-              style={styles.convCard}
-            />
-          ))}
-        </View>
-
-        {/* Spacer for bottom tab bar */}
-        <View style={{ height: 80 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  screenContainer: {
+  screen: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
-  contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+  content: {
+    paddingTop: s.xl,
   },
-  greetingSection: {
-    marginBottom: 16,
-  },
-  greetingTitle: {
-    color: colors.text1,
-    fontSize: 24,
-    fontWeight: "600",
-    letterSpacing: -0.3,
-  },
-  greetingSubtitle: {
-    color: colors.text3,
-    fontSize: 13,
-    marginTop: 4,
-  },
-  orbCard: {
-    alignItems: "center",
-    paddingVertical: 22,
-    marginBottom: 20,
-    backgroundColor: colors.surface2,
-  },
-  orbTouchArea: {
-    alignItems: "center",
-  },
-  orbTextContainer: {
-    alignItems: "center",
-    marginTop: 14,
-  },
-  orbPrompt: {
-    color: colors.text1,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  orbSubPrompt: {
-    color: colors.accent2,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionHeader: {
+  mastheadRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
-    paddingHorizontal: 4,
+    marginBottom: s.huge,
   },
-  sectionTitle: {
-    color: colors.text3,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
+  greetingBlock: {
+    marginBottom: s.lg,
   },
-  seeAllText: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "600",
+  greeting: {
+    letterSpacing: -0.5,
   },
-  toolsRow: {
+  greetingName: {
+    letterSpacing: -0.5,
+  },
+  subGreeting: {
+    color: colors.textMuted,
+    fontSize: 14,
+    marginTop: 8,
+  },
+  deviceRow: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 20,
-  },
-  toolBtn: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.sm,
-    paddingVertical: 12,
     alignItems: "center",
+    gap: 7,
+    marginTop: s.xl,
   },
-  toolIcon: {
-    fontSize: 18,
-    marginBottom: 4,
-    color: colors.accent,
+  deviceDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  toolLabel: {
-    color: colors.text2,
-    fontSize: 11,
-    fontWeight: "600",
+  rule: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: s.xxl,
   },
-  convCard: {
-    marginBottom: 8,
+  voiceSection: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: s.md,
+  },
+  readyText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  section: {
+    marginBottom: s.sm,
+  },
+  todayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  todayNumeral: {
+    fontSize: 26,
+    fontWeight: "300",
+    letterSpacing: -0.5,
+    minWidth: 44,
+    fontVariant: ["tabular-nums"],
+  },
+  todayLabel: {
+    color: colors.text,
+    fontSize: 15,
+    flex: 1,
+  },
+  todayMarker: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  convRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  convTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  convMeta: {
+    color: colors.textDim,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  emptyText: {
+    color: colors.textDim,
+    fontSize: 13.5,
+    paddingVertical: 12,
   },
 });

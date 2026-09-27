@@ -39,6 +39,8 @@ export interface LectureNote {
   transcript: string;
   summary: string;
   keyTakeaways: string[];
+  /** Structured study notes (markdown bullets/headings) generated from the transcript */
+  notes?: string;
   createdAt: number;
 }
 

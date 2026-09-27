@@ -1,6 +1,10 @@
+/**
+ * StatusIndicator — small factual dot + label. No pill background.
+ */
+
 import React from "react";
 import { View, Text, StyleSheet, ViewStyle } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { colors } from "../theme/colors";
 
 interface StatusIndicatorProps {
   label: string;
@@ -14,23 +18,14 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
   style,
 }) => {
   let dotColor = colors.success;
-  let bgColor = colors.successSoft;
-
-  if (status === "warning") {
-    dotColor = colors.warning;
-    bgColor = colors.warningSoft;
-  } else if (status === "error") {
-    dotColor = colors.error;
-    bgColor = colors.errorSoft;
-  } else if (status === "accent") {
-    dotColor = colors.accent;
-    bgColor = colors.accentSoft;
-  }
+  if (status === "warning") dotColor = colors.warning;
+  else if (status === "error") dotColor = colors.error;
+  else if (status === "accent") dotColor = colors.accent;
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }, style]}>
+    <View style={[styles.container, style]}>
       <View style={[styles.dot, { backgroundColor: dotColor }]} />
-      <Text style={[styles.label, { color: dotColor }]}>{label}</Text>
+      <Text style={styles.label}>{label}</Text>
     </View>
   );
 };
@@ -39,9 +34,6 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radii.full,
     gap: 6,
   },
   dot: {
@@ -50,7 +42,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   label: {
-    fontSize: 11,
-    fontWeight: "600",
+    color: colors.textMuted,
+    fontSize: 11.5,
   },
 });

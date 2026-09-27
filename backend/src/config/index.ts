@@ -1,6 +1,8 @@
 import dotenv from "dotenv";
 
-dotenv.config();
+// .env is the project's source of truth; override stray shell variables
+// (e.g. a global PORT=0) so the backend always binds the configured port.
+dotenv.config({ override: true });
 
 const parseBooleanEnv = (value: string | undefined, fallback: boolean): boolean => {
   if (value === undefined) return fallback;

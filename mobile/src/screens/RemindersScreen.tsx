@@ -1,3 +1,9 @@
+/**
+ * RemindersScreen — editorial task list.
+ * Serif header line, mono section labels, circle checks, thin separators,
+ * small accent markers for priority.
+ */
+
 import React, { useState } from "react";
 import {
   View,
@@ -7,98 +13,140 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing as s, radii } from "../theme/spacing";
+import { useLayout } from "../theme/responsive";
 import { Header } from "../components/Header";
 import { ReminderCard } from "../components/ReminderCard";
 import { AuraButton } from "../components/AuraButton";
+import { Icon } from "../components/Icon";
+import { MonoLabel } from "../components/Typography";
 import { useStudyStore } from "../stores/studyStore";
 
 export const RemindersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { reminders, addReminder, toggleReminder, deleteReminder } = useStudyStore();
+  const insets = useSafeAreaInsets();
+  const { contentMaxWidth, gutter } = useLayout();
+  const { reminders, addReminder, toggleReminder, deleteReminder, backendOffline } = useStudyStore();
   const [showAdd, setShowAdd] = useState(false);
   const [title, setTitle] = useState("");
-  const [dueTime, setDueTime] = useState("Today, 8:00 PM");
-  const [tag, setTag] = useState("Exam");
+  const [dueTime, setDueTime] = useState("");
+  const [tag, setTag] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleCreate = () => {
-    if (!title.trim()) return;
-    addReminder(title.trim(), dueTime, tag);
-    setTitle("");
-    setShowAdd(false);
+  const handleCreate = async () => {
+    if (!title.trim() || isSaving) return;
+    setIsSaving(true);
+    try {
+      await addReminder(title.trim(), dueTime.trim() || "Soon", tag.trim() || "General");
+      setTitle("");
+      setDueTime("");
+      setShowAdd(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const pending = reminders.filter((r) => !r.completed);
+  const completed = reminders.filter((r) => r.completed);
 
   return (
     <View style={styles.container}>
-      <Header
-        title="Reminders"
-        subtitle="Notification-Ready Academic Alerts"
-        showBack={true}
-        onBack={() => navigation.goBack()}
-        rightAction={
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => setShowAdd(!showAdd)}
-          >
-            <Text style={styles.addBtnText}>{showAdd ? "✕" : "+ New"}</Text>
-          </TouchableOpacity>
-        }
-      />
+      <View style={{ maxWidth: contentMaxWidth, width: "100%", alignSelf: "center" }}>
+        <Header
+          title="Reminders"
+          subtitle={backendOffline ? "Saved on this device" : "Synced"}
+          showBack={true}
+          onBack={() => navigation.goBack()}
+          showDeviceBadge={false}
+          rightAction={
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setShowAdd(!showAdd)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name={showAdd ? "x" : "plus"} size={18} color={colors.ink} />
+            </TouchableOpacity>
+          }
+        />
+      </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: gutter,
+            maxWidth: contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+            paddingBottom: 60 + insets.bottom,
+          },
+        ]}
+      >
         {showAdd && (
-          <View style={styles.formCard}>
-            <Text style={styles.formHeading}>Create Reminder</Text>
-            <Text style={styles.inputLabel}>What do you need to be reminded of?</Text>
+          <View style={styles.form}>
+            <MonoLabel color={colors.ink}>NEW REMINDER</MonoLabel>
             <TextInput
               style={styles.input}
               value={title}
               onChangeText={setTitle}
-              placeholder="e.g. Review cryptography notes before dinner"
-              placeholderTextColor={colors.text3}
+              placeholder="Submit DBMS assignment"
+              placeholderTextColor={colors.textDim}
             />
-
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>Due Time</Text>
-                <TextInput
-                  style={styles.input}
-                  value={dueTime}
-                  onChangeText={setDueTime}
-                  placeholder="e.g. Today, 9:00 PM"
-                  placeholderTextColor={colors.text3}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>Category / Tag</Text>
-                <TextInput
-                  style={styles.input}
-                  value={tag}
-                  onChangeText={setTag}
-                  placeholder="e.g. Thesis / Exam"
-                  placeholderTextColor={colors.text3}
-                />
-              </View>
+            <View style={styles.formRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={dueTime}
+                onChangeText={setDueTime}
+                placeholder="Tomorrow · 10:00"
+                placeholderTextColor={colors.textDim}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={tag}
+                onChangeText={setTag}
+                placeholder="Tag"
+                placeholderTextColor={colors.textDim}
+              />
             </View>
-
             <AuraButton
-              title="Schedule Reminder"
-              onPress={handleCreate}
+              title="Add reminder"
+              onPress={() => void handleCreate()}
               variant="primary"
+              loading={isSaving}
+              disabled={!title.trim()}
             />
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>SCHEDULED REMINDERS</Text>
-        {reminders.map((r) => (
+        <MonoLabel color={colors.textDim}>SCHEDULED</MonoLabel>
+        {pending.length === 0 && completed.length === 0 && (
+          <Text style={styles.emptyNote}>Nothing scheduled yet.</Text>
+        )}
+        {pending.map((r) => (
           <ReminderCard
             key={r.id}
             reminder={r}
-            onToggle={() => toggleReminder(r.id)}
-            onDelete={() => deleteReminder(r.id)}
+            onToggle={() => void toggleReminder(r.id)}
+            onDelete={() => void deleteReminder(r.id)}
           />
         ))}
 
-        <View style={{ height: 80 }} />
+        {completed.length > 0 && (
+          <>
+            <MonoLabel color={colors.textDim} style={{ marginTop: s.xxl }}>
+              COMPLETED
+            </MonoLabel>
+            {completed.map((r) => (
+              <ReminderCard
+                key={r.id}
+                reminder={r}
+                onToggle={() => void toggleReminder(r.id)}
+                onDelete={() => void deleteReminder(r.id)}
+              />
+            ))}
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -107,65 +155,43 @@ export const RemindersScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: s.xl,
   },
   addBtn: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    padding: 8,
     borderRadius: radii.sm,
   },
-  addBtnText: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  formCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+  form: {
     borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 16,
-    marginBottom: 20,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    padding: s.lg,
+    marginBottom: s.xxl,
+    backgroundColor: colors.surfaceElevated,
   },
-  formHeading: {
-    color: colors.text1,
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  row: {
+  formRow: {
     flexDirection: "row",
-    gap: 12,
-  },
-  inputLabel: {
-    color: colors.text2,
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 4,
+    gap: s.sm,
   },
   input: {
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radii.sm,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: colors.text1,
-    fontSize: 13,
-    marginBottom: 12,
+    paddingVertical: 10,
+    color: colors.ink,
+    fontSize: 14.5,
+    marginBottom: s.sm,
+    marginTop: s.md,
   },
-  sectionTitle: {
-    color: colors.text3,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 12,
+  emptyNote: {
+    color: colors.textDim,
+    fontSize: 14,
+    paddingVertical: s.lg,
+    fontStyle: "italic",
   },
 });

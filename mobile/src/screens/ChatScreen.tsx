@@ -1,4 +1,10 @@
-import React, { useState, useRef } from "react";
+/**
+ * ChatScreen — editorial conversation.
+ * Mono masthead, hairline rules, typography-first messages, a flat input bar
+ * with a small circular send control.
+ */
+
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,14 +14,21 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing as s, radii } from "../theme/spacing";
+import { useLayout } from "../theme/responsive";
 import { MessageBubble } from "../components/MessageBubble";
-import { Header } from "../components/Header";
+import { Icon } from "../components/Icon";
+import { MonoLabel } from "../components/Typography";
 import { useChatStore } from "../stores/chatStore";
 import { USE_MOCK_AI } from "../config/env";
 
 export const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { isDesktop, isSmallPhone, contentMaxWidth } = useLayout();
+  const insets = useSafeAreaInsets();
   const {
     conversations,
     activeConversationId,
@@ -24,27 +37,31 @@ export const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     deleteConversation,
     sendMessage,
     isSending,
+    backendOffline,
   } = useChatStore();
 
   const [inputText, setInputText] = useState("");
-  const [showThreadDrawer, setShowThreadDrawer] = useState(false);
+  const [showThreadModal, setShowThreadModal] = useState(false);
   const scrollRef = useRef<any>(null);
 
   const activeConv =
     conversations.find((c) => c.id === activeConversationId) || conversations[0];
 
+  useEffect(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+  }, [activeConv?.messages.length, isSending]);
+
   const handleSend = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isSending) return;
     const textToSend = inputText.trim();
     setInputText("");
     await sendMessage(textToSend);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
   const handleNewChat = () => {
     const newId = createConversation();
     setActiveConversation(newId);
-    setShowThreadDrawer(false);
+    setShowThreadModal(false);
   };
 
   return (
@@ -52,142 +69,121 @@ export const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.container}
     >
-      <Header
-        title={activeConv?.title || "AURA Chat"}
-        subtitle={`${activeConv?.messages?.length || 0} messages`}
-        onDeviceBadgePress={() => navigation.navigate("Device")}
-        rightAction={
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              onPress={() => setShowThreadDrawer(!showThreadDrawer)}
-              style={styles.headerBtn}
-            >
-              <Text style={styles.headerBtnText}>☰ Threads</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleNewChat}
-              style={[styles.headerBtn, styles.newChatBtn]}
-            >
-              <Text style={styles.newChatText}>+ New</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
-
-      {/* Threads Drawer / Dropdown */}
-      {showThreadDrawer && (
-        <View style={styles.drawer}>
-          <Text style={styles.drawerHeader}>ALL CONVERSATIONS</Text>
-          <ScrollView style={styles.drawerScroll}>
-            {conversations.map((c) => {
-              const isActive = c.id === activeConversationId;
-              return (
-                <View
-                  key={c.id}
-                  style={[styles.drawerItem, isActive && styles.drawerItemActive]}
-                >
-                  <TouchableOpacity
-                    style={styles.drawerItemTouch}
-                    onPress={() => {
-                      setActiveConversation(c.id);
-                      setShowThreadDrawer(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.drawerItemText,
-                        isActive && styles.drawerItemTextActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {c.isPinned ? "📌 " : ""}{c.title}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {conversations.length > 1 && (
-                    <TouchableOpacity
-                      onPress={() => deleteConversation(c.id)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={styles.drawerDeleteBtn}
-                    >
-                      <Text style={styles.drawerDeleteText}>✕</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
+      {/* Masthead */}
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {activeConv?.title || "Chat"}
+          </Text>
+          <MonoLabel>
+            {!USE_MOCK_AI && !backendOffline
+              ? "CONNECTED"
+              : USE_MOCK_AI
+              ? "DEMO MODE"
+              : "OFFLINE"}
+          </MonoLabel>
         </View>
-      )}
 
-      <View style={styles.modeBanner}>
-        <View style={[styles.liveDot, !USE_MOCK_AI && styles.liveDotActive]} />
-        <Text style={styles.modeText}>{USE_MOCK_AI ? "Mock mode" : "Live AI mode"}</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => setShowThreadModal(true)}
+            style={styles.headerBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon name="list" size={19} color={colors.ink} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleNewChat}
+            style={styles.headerBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon name="plus" size={19} color={colors.ink} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Messages List */}
+      {/* Messages */}
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.messagesList}
+        style={styles.messagesScroll}
+        contentContainerStyle={[
+          styles.messagesList,
+          {
+            maxWidth: contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+            paddingHorizontal: isSmallPhone ? 20 : 24,
+          },
+        ]}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
         {activeConv?.messages?.map((msg) => (
           <MessageBubble
             key={msg.id}
             message={msg}
-            onSpeak={() => navigation.navigate("Voice")}
+            onSpeak={(text) => {
+              import("../services/speech/WebSpeechService").then(({ speakText }) =>
+                speakText(text)
+              );
+            }}
           />
         ))}
 
         {isSending && (
-          <View style={styles.typingIndicator}>
-            <View style={styles.typingDot} />
-            <View style={[styles.typingDot, { opacity: 0.7 }]} />
-            <View style={[styles.typingDot, { opacity: 0.4 }]} />
-            <Text style={styles.typingText}>AURA is reasoning...</Text>
+          <View style={styles.typingRow}>
+            <Text style={styles.typingLabel}>AURA</Text>
+            <Text style={styles.typingText}>thinking…</Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Suggested Quick Prompts */}
-      <View style={styles.promptSuggestions}>
-        <TouchableOpacity
-          style={styles.suggestionPill}
-          onPress={() => setInputText("Explain binary search in simple terms.")}
+      {/* Quick prompts on a fresh thread */}
+      {(activeConv?.messages?.length ?? 0) <= 1 && !isSending && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.promptSuggestions,
+            { maxWidth: contentMaxWidth, alignSelf: "center" },
+          ]}
         >
-          <Text style={styles.suggestionText}>Explain binary search</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.suggestionPill}
-          onPress={() => setInputText("What is the difference between TCP and UDP?")}
-        >
-          <Text style={styles.suggestionText}>TCP vs UDP</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.suggestionPill}
-          onPress={() => setInputText("What should I study today?")}
-        >
-          <Text style={styles.suggestionText}>What to study?</Text>
-        </TouchableOpacity>
-      </View>
+          {[
+            "Explain binary search",
+            "TCP vs UDP",
+            "What should I study today?",
+            "Summarize the OSI model",
+          ].map((prompt) => (
+            <TouchableOpacity
+              key={prompt}
+              style={styles.suggestionPill}
+              onPress={() => setInputText(prompt)}
+            >
+              <Text style={styles.suggestionText}>{prompt}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
-      {/* Input Bar */}
-      <View style={styles.inputBar}>
-        <TouchableOpacity
-          style={styles.micButton}
-          onPress={() => navigation.navigate("Voice")}
-        >
-          <Text style={styles.micIcon}>◉</Text>
-        </TouchableOpacity>
-
+      {/* Input bar */}
+      <View
+        style={[
+          styles.inputBar,
+          {
+            maxWidth: contentMaxWidth,
+            paddingHorizontal: isSmallPhone ? 16 : 20,
+            paddingBottom: Math.max(insets.bottom, isDesktop ? 16 : 12) + 62,
+          },
+        ]}
+      >
         <TextInput
           style={styles.textInput}
           value={inputText}
           onChangeText={setInputText}
-          placeholder="Message AURA or ask about study..."
-          placeholderTextColor={colors.text3}
+          placeholder="Ask AURA"
+          placeholderTextColor={colors.textDim}
           onSubmitEditing={handleSend}
           returnKeyType="send"
+          multiline
         />
 
         <TouchableOpacity
@@ -195,11 +191,68 @@ export const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={handleSend}
           disabled={!inputText.trim() || isSending}
         >
-          <Text style={styles.sendIcon}>↑</Text>
+          <Icon name="arrow-up" size={16} color={colors.paper} />
         </TouchableOpacity>
       </View>
 
-      <View style={{ height: 75 }} />
+      {/* Threads modal */}
+      <Modal
+        visible={showThreadModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowThreadModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowThreadModal(false)}
+        >
+          <View style={[styles.modalCard, { maxWidth: isDesktop ? 460 : 340 }]}>
+            <View style={styles.modalHeaderRow}>
+              <MonoLabel color={colors.ink}>CONVERSATIONS</MonoLabel>
+              <TouchableOpacity onPress={handleNewChat}>
+                <Text style={styles.modalNewBtn}>New</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {conversations.map((c) => {
+                const isActive = c.id === activeConversationId;
+                return (
+                  <View key={c.id} style={styles.drawerItem}>
+                    <TouchableOpacity
+                      style={styles.drawerItemTouch}
+                      onPress={() => {
+                        setActiveConversation(c.id);
+                        setShowThreadModal(false);
+                      }}
+                    >
+                      <Text
+                        style={[styles.drawerItemText, isActive && styles.drawerItemTextActive]}
+                        numberOfLines={1}
+                      >
+                        {c.title}
+                      </Text>
+                      <Text style={styles.drawerItemMeta}>
+                        {c.messages.length} {c.messages.length === 1 ? "message" : "messages"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {conversations.length > 1 && (
+                      <TouchableOpacity
+                        onPress={() => deleteConversation(c.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={styles.drawerDeleteBtn}
+                      >
+                        <Icon name="x" size={13} color={colors.textDim} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -207,188 +260,162 @@ export const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
-  headerButtons: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  headerBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: colors.surface2,
-    borderRadius: radii.sm,
-  },
-  headerBtnText: {
-    color: colors.text2,
-    fontSize: 12,
-  },
-  newChatBtn: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-    borderWidth: 1,
-  },
-  newChatText: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  drawer: {
-    backgroundColor: colors.surface2,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    padding: 12,
-    maxHeight: 220,
-  },
-  drawerHeader: {
-    color: colors.text3,
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  drawerScroll: {
-    maxHeight: 180,
-  },
-  drawerItem: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerText: {
+    flex: 1,
+    marginRight: 12,
+  },
+  headerTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  headerBtn: {
+    padding: 8,
     borderRadius: radii.sm,
   },
-  drawerItemActive: {
-    backgroundColor: colors.surfaceHover,
-  },
-  drawerItemTouch: {
+  messagesScroll: {
     flex: 1,
   },
-  drawerItemText: {
-    color: colors.text2,
-    fontSize: 13,
+  messagesList: {
+    paddingVertical: s.lg,
+    width: "100%",
   },
-  drawerItemTextActive: {
-    color: colors.accent,
-    fontWeight: "600",
-  },
-  drawerDeleteBtn: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  drawerDeleteText: {
-    color: colors.text3,
-    fontSize: 12,
-  },
-  modeBanner: {
+  typingRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 4,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.text3,
-  },
-  liveDotActive: {
-    backgroundColor: colors.accent,
-  },
-  modeText: {
-    color: colors.text2,
-    fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  messagesList: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  typingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
     marginVertical: 10,
-    paddingHorizontal: 8,
   },
-  typingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
+  typingLabel: {
+    color: colors.textDim,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.4,
+    fontFamily: "Menlo",
   },
   typingText: {
-    color: colors.text3,
-    fontSize: 12,
-    marginLeft: 4,
+    color: colors.textDim,
+    fontSize: 12.5,
   },
   promptSuggestions: {
     flexDirection: "row",
     paddingHorizontal: 16,
     gap: 8,
-    marginBottom: 8,
-    flexWrap: "nowrap",
+    paddingVertical: 8,
   },
   suggestionPill: {
-    backgroundColor: colors.surface,
+    backgroundColor: "transparent",
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radii.full,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   suggestionText: {
-    color: colors.text2,
-    fontSize: 11,
+    color: colors.textMuted,
+    fontSize: 12.5,
   },
   inputBar: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
+    alignItems: "flex-end",
+    width: "100%",
+    alignSelf: "center",
     gap: 10,
-  },
-  micButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  micIcon: {
-    color: colors.accent,
-    fontSize: 18,
   },
   textInput: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radii.lg,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: colors.text1,
-    fontSize: 14,
+    borderRadius: radii.sm,
+    paddingHorizontal: 13,
+    paddingTop: 10,
+    paddingBottom: 10,
+    color: colors.ink,
+    fontSize: 15,
+    maxHeight: 110,
   },
   sendButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.accent,
+    borderRadius: radii.full,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
   sendButtonDisabled: {
-    opacity: 0.4,
+    opacity: 0.25,
   },
-  sendIcon: {
-    color: colors.accentContrast,
-    fontSize: 18,
-    fontWeight: "700",
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radii.sheet,
+    padding: 16,
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  modalNewBtn: {
+    color: colors.blue,
+    fontSize: 13.5,
+    fontWeight: "600",
+  },
+  drawerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 11,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  drawerItemTouch: {
+    flex: 1,
+  },
+  drawerItemText: {
+    color: colors.textMuted,
+    fontSize: 14,
+  },
+  drawerItemTextActive: {
+    color: colors.ink,
+    fontWeight: "600",
+  },
+  drawerItemMeta: {
+    color: colors.textDim,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  drawerDeleteBtn: {
+    padding: 6,
+    marginLeft: 8,
   },
 });

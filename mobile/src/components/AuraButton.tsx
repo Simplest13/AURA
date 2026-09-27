@@ -1,3 +1,9 @@
+/**
+ * AuraButton — editorial control.
+ * Primary: solid ink, paper text. Secondary: hairline outline. Mono uppercase
+ * label in small sizes gives the technical-product feel.
+ */
+
 import React from "react";
 import {
   TouchableOpacity,
@@ -9,7 +15,7 @@ import {
 } from "react-native";
 import { colors } from "../theme/colors";
 import { radii } from "../theme/spacing";
-import { shadows } from "../theme/shadows";
+import { monoFamily } from "../theme/typography";
 
 interface AuraButtonProps {
   title: string;
@@ -34,51 +40,46 @@ export const AuraButton: React.FC<AuraButtonProps> = ({
   style,
   textStyle,
 }) => {
-  let btnBg = colors.primary;
-  let btnBorder = "transparent";
-  let textColor = "#FFFFFF";
-  let glowStyle = shadows.glowPrimary;
+  let btnBg = colors.ink;
+  let btnBorder = colors.ink;
+  let textColor = colors.paper;
 
   if (variant === "secondary") {
     btnBg = colors.surfaceElevated;
     btnBorder = colors.border;
-    textColor = colors.text;
-    glowStyle = {};
+    textColor = colors.ink;
   } else if (variant === "outline") {
     btnBg = "transparent";
-    btnBorder = colors.primary;
-    textColor = colors.primary;
-    glowStyle = {};
+    btnBorder = colors.ink;
+    textColor = colors.ink;
   } else if (variant === "ghost") {
     btnBg = "transparent";
     btnBorder = "transparent";
     textColor = colors.textMuted;
-    glowStyle = {};
   } else if (variant === "danger") {
     btnBg = colors.error;
-    btnBorder = "transparent";
-    textColor = "#FFFFFF";
-    glowStyle = {};
+    btnBorder = colors.error;
+    textColor = colors.paper;
   }
 
-  const padVertical = size === "sm" ? 8 : size === "lg" ? 15 : 11;
+  const padVertical = size === "sm" ? 7 : size === "lg" ? 14 : 11;
   const padHorizontal = size === "sm" ? 14 : size === "lg" ? 24 : 18;
-  const fontSize = size === "sm" ? 12 : size === "lg" ? 16 : 14;
+  const fontSize = size === "sm" ? 11 : size === "lg" ? 13 : 12;
+  const useMono = size !== "lg";
 
   return (
     <TouchableOpacity
-      activeOpacity={0.82}
+      activeOpacity={0.85}
       onPress={onPress}
       disabled={disabled || loading}
       style={[
         styles.button,
-        variant === "primary" ? glowStyle : undefined,
         {
           backgroundColor: btnBg,
           borderColor: btnBorder,
           paddingVertical: padVertical,
           paddingHorizontal: padHorizontal,
-          opacity: disabled ? 0.45 : 1,
+          opacity: disabled ? 0.4 : 1,
         },
         style,
       ]}
@@ -91,7 +92,12 @@ export const AuraButton: React.FC<AuraButtonProps> = ({
           <Text
             style={[
               styles.text,
-              { color: textColor, fontSize, marginLeft: icon ? 8 : 0 },
+              {
+                color: textColor,
+                fontSize,
+                fontFamily: useMono ? monoFamily : undefined,
+                marginLeft: icon ? 8 : 0,
+              },
               textStyle,
             ]}
           >
@@ -105,7 +111,7 @@ export const AuraButton: React.FC<AuraButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -113,6 +119,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontWeight: "600",
-    letterSpacing: 0.3,
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
 });

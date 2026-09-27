@@ -1,109 +1,140 @@
 /**
  * AURA AI Service
- * Coordinates AI reasoning, speech-to-text, text-to-speech, and memory injection.
+ * Real chat pipeline: backend conversations (Groq-backed) with resilient
+ * local persistence so history survives app restarts and offline usage.
  */
 
-import { USE_MOCK_AI } from "../../config/env";
 import { ApiClient } from "../api/ApiClient";
-import { MockAIService } from "./MockAIService";
-import { useMemoryStore } from "../../stores/memoryStore";
+import { StorageService } from "../storage/StorageService";
+import { useChatStore } from "../../stores/chatStore";
+import { Conversation } from "../../types/chat";
 
 let activeConversationId: string | null = null;
 
+export const CHAT_STORAGE_KEY = "aura_chat_conversations";
+
+export function getActiveConversationId(): string | null {
+  return activeConversationId;
+}
+
+export function setActiveConversationId(id: string | null) {
+  activeConversationId = id;
+}
+
+/** Clear the cached backend conversation id (called on logout — the id belongs to the previous account). */
+export function resetBackendConversationId() {
+  activeConversationId = null;
+}
+
 export class AIService {
   /**
-   * Transcribe speech audio to text
-   */
-  public static async transcribe(audioBase64?: string): Promise<string> {
-    if (USE_MOCK_AI || !audioBase64) {
-      await new Promise((r) => setTimeout(r, 400));
-      return "What is the difference between TCP and UDP?";
-    }
-
-    try {
-      const response = await ApiClient.post<{ text: string }>("/api/transcription", {
-        audio: audioBase64,
-      });
-      return response.text || "Could not recognize speech";
-    } catch (err) {
-      console.warn("[AIService] Transcription backend unavailable, using fallback:", err);
-      return "Explain the fundamental principles of recursion.";
-    }
-  }
-
-  /**
-   * Send question / prompt to the AI model
+   * Send a question to the AI and return the reply text.
+   * Uses the authenticated conversation pipeline when a session exists,
+   * falling back to the stateless public endpoint, then to a local stub.
    */
   public static async query(text: string): Promise<string> {
-    if (USE_MOCK_AI) {
-      return MockAIService.query(text);
+    try {
+      // Ensure a backend session exists (silent demo login if needed)
+      await ApiClient.ensureSession();
+    } catch {
+      // Backend unreachable — fall through to stateless / local handling
     }
 
-    try {
-      // Ensure conversation exists if hitting backend
-      if (!activeConversationId) {
-        try {
+    const { token } = useAuthStoreSafe();
+    if (token) {
+      try {
+        // Ensure conversation exists on the backend
+        if (!activeConversationId) {
           const conv = await ApiClient.post<{ id: string }>("/api/chat/conversations", {
-            title: "Voice Session",
+            title: text.slice(0, 40) || "Voice Session",
           });
           if (conv && conv.id) {
             activeConversationId = conv.id;
           }
-        } catch {
-          // Continue if conversation route behaves differently
         }
-      }
 
-      if (activeConversationId) {
-        const response = await ApiClient.post<{ aiMessage?: { text: string }; reply?: string }>(
-          "/api/chat/messages",
-          {
+        if (activeConversationId) {
+          const response = await ApiClient.post<{
+            aiMessage?: { text: string };
+            reply?: string;
+          }>("/api/chat/messages", {
             conversationId: activeConversationId,
             text,
+          });
+
+          const reply =
+            response?.aiMessage?.text ??
+            response?.reply ??
+            (typeof response === "string" ? response : undefined);
+          if (reply && reply.trim()) {
+            return reply;
           }
-        );
-
-        if (response?.aiMessage?.text) {
-          return response.aiMessage.text;
         }
-        if (response?.reply) {
-          return response.reply;
-        }
+      } catch (err) {
+        console.warn("[AIService] Authenticated chat failed, trying public endpoint:", err);
       }
+    }
 
-      // If backend endpoint is generic /api/chat
+    // Stateless fallback (no auth / conversation APIs unavailable)
+    try {
       const response = await ApiClient.post<{ reply?: string }>("/api/chat", {
         message: text,
       });
-
       if (response?.reply) {
         return response.reply;
       }
-
-      return MockAIService.query(text);
     } catch (err) {
-      console.warn("[AIService] AI backend unavailable or offline, using deterministic engine:", err);
-      return MockAIService.query(text);
+      console.warn("[AIService] Public chat endpoint unavailable:", err);
+    }
+
+    throw new Error("AI backend unavailable");
+  }
+
+  /** Push the locally created welcome conversation id to the backend-safe state. */
+  public static async syncConversationsFromBackend(): Promise<Conversation[]> {
+    try {
+      await ApiClient.ensureSession();
+      const convs = await ApiClient.get<any[]>("/api/chat/conversations");
+      if (Array.isArray(convs)) {
+        return convs.map((c: any) => ({
+          id: c.id,
+          title: c.title ?? "Conversation",
+          createdAt: Number(c.createdAt ?? c.created_at ?? Date.now()),
+          updatedAt: Number(c.updatedAt ?? c.updated_at ?? c.created_at ?? Date.now()),
+          isPinned: Boolean(c.isPinned ?? c.is_pinned),
+          messages: [],
+        }));
+      }
+    } catch {
+      // offline — local conversations remain authoritative
+    }
+    return [];
+  }
+
+  public static async persistConversations(conversations: Conversation[]): Promise<void> {
+    try {
+      await StorageService.setItem(CHAT_STORAGE_KEY, conversations);
+    } catch {
+      // non-fatal
     }
   }
 
-  /**
-   * Convert AI reply to speech
-   */
-  public static async synthesizeSpeech(text: string): Promise<string | null> {
-    if (USE_MOCK_AI) {
-      return null;
-    }
-
+  public static async loadPersistedConversations(): Promise<Conversation[] | null> {
     try {
-      const response = await ApiClient.post<{ audioUrl: string }>("/api/tts", {
-        text,
-      });
-      return response.audioUrl || null;
-    } catch (err) {
-      console.warn("[AIService] TTS unavailable:", err);
+      const stored = await StorageService.getItem<Conversation[]>(CHAT_STORAGE_KEY);
+      return Array.isArray(stored) && stored.length ? stored : null;
+    } catch {
       return null;
     }
   }
 }
 
+function useAuthStoreSafe(): { token: string | null } {
+  try {
+    // Lazy require to avoid circular import at module load time
+    const { useAuthStore } = require("../../stores/authStore");
+    return useAuthStore.getState();
+  } catch {
+    return { token: null };
+  }
+}

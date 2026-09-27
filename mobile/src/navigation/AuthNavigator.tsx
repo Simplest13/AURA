@@ -1,6 +1,9 @@
 /**
  * AuthNavigator - AURA Mobile
- * Handles unauthenticated authentication flows: Login, Register, Onboarding.
+ * Unauthenticated flow: Login ↔ Register (+ Onboarding kept for legacy entry).
+ * `detachInactiveScreens` + default stack behavior means Android back from
+ * Login after logout cannot re-enter authenticated screens — the whole
+ * authenticated tree unmounts when isAuthenticated flips false.
  */
 
 import React from "react";
@@ -28,4 +31,3 @@ export const AuthNavigator: React.FC = () => {
     </Stack.Navigator>
   );
 };
-

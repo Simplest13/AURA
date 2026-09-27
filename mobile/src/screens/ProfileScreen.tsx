@@ -1,344 +1,228 @@
-import React, { useState } from "react";
+/**
+ * ProfileScreen — editorial settings list.
+ */
+
+import React from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
-import { Header } from "../components/Header";
-import { GlassCard } from "../components/GlassCard";
-import { AuraButton } from "../components/AuraButton";
-import { useAuthStore } from "../stores/authStore";
-import { useMemoryStore } from "../stores/memoryStore";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing as s, radii } from "../theme/spacing";
+import { useLayout } from "../theme/responsive";
+import { Icon, IconName } from "../components/Icon";
+import { SerifText, MonoLabel } from "../components/Typography";
+import { useAuth } from "../hooks/useAuth";
+import { useDeviceStore } from "../stores/deviceStore";
+
+interface SettingsRowProps {
+  icon: IconName;
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  last?: boolean;
+}
+
+const SettingsRow: React.FC<SettingsRowProps> = ({ icon, label, value, onPress, last }) => (
+  <TouchableOpacity
+    activeOpacity={onPress ? 0.7 : 1}
+    onPress={onPress}
+    disabled={!onPress}
+    style={[styles.settingsRow, !last && styles.settingsRowBordered]}
+  >
+    <Icon name={icon} size={16} color={colors.textMuted} />
+    <Text style={styles.settingsLabel}>{label}</Text>
+    {value ? <Text style={styles.settingsValue}>{value}</Text> : null}
+    {onPress ? <Icon name="chevron-right" size={14} color={colors.textDim} /> : null}
+  </TouchableOpacity>
+);
 
 export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user, logout } = useAuthStore();
-  const { memories, deleteMemory } = useMemoryStore();
+  const insets = useSafeAreaInsets();
+  const { contentMaxWidth, gutter } = useLayout();
+  const { user, logout } = useAuth();
+  const { currentDevice } = useDeviceStore();
 
-  const [memoryEnabled, setMemoryEnabled] = useState(true);
-  const [selectedModel, setSelectedModel] = useState("Claude 3.5 Sonnet");
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigation.replace("Login");
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
+  const memberSince = React.useMemo(() => {
+    if (!user?.createdAt) return null;
+    try {
+      return new Date(user.createdAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+      });
+    } catch {
+      return null;
+    }
+  }, [user?.createdAt]);
+
   return (
-    <View style={styles.container}>
-      <Header
-        title="Profile & Settings"
-        subtitle="Second Brain Preferences"
-        onDeviceBadgePress={() => navigation.navigate("Device")}
-      />
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: gutter,
+            maxWidth: contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+            paddingBottom: 110 + insets.bottom,
+          },
+        ]}
+      >
+        <MonoLabel color={colors.ink}>PROFILE</MonoLabel>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* User Card */}
-        <GlassCard style={styles.userCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarLetter}>
-              {user?.name ? user.name[0].toUpperCase() : "S"}
-            </Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.userName}>{user?.name || "Shivam"}</Text>
-            <Text style={styles.userEmail}>{user?.email || "shivam@alignsoul.co"}</Text>
-            <View style={styles.planBadge}>
-              <Text style={styles.planText}>Student Free Tier</Text>
-            </View>
-          </View>
-        </GlassCard>
+        {/* Identity */}
+        <View style={styles.identityBlock}>
+          <SerifText size={28} style={styles.userName}>
+            {user?.name || "Student"}
+          </SerifText>
+          <Text style={styles.userEmail}>{user?.email || "—"}</Text>
+          {memberSince ? (
+            <MonoLabel color={colors.textDim} style={{ marginTop: 8 }}>
+              MEMBER SINCE {memberSince.toUpperCase()}
+            </MonoLabel>
+          ) : null}
+        </View>
 
-        {/* Device Settings Shortcut */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate("Device")}
-          style={styles.menuRow}
-        >
-          <View style={styles.menuIcon}>
-            <Text>⊚</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.menuTitle}>Wearable Hardware Manager</Text>
-            <Text style={styles.menuSubtitle}>BLE connection, battery, button triggers</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
+        <View style={styles.rule} />
 
-        {/* Long-Term Memory Toggle */}
-        <View style={styles.menuRow}>
-          <View style={styles.menuIcon}>
-            <Text>✺</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.menuTitle}>Long-Term Conversational Memory</Text>
-            <Text style={styles.menuSubtitle}>
-              Let AURA extract and retain study facts
-            </Text>
-          </View>
-          <Switch
-            value={memoryEnabled}
-            onValueChange={setMemoryEnabled}
-            thumbColor={colors.accent}
-            trackColor={{ false: colors.surface2, true: colors.accentSoft }}
+        {/* Account */}
+        <MonoLabel color={colors.textDim}>ACCOUNT</MonoLabel>
+        <View style={styles.group}>
+          <SettingsRow icon="user" label="Personal information" onPress={() => {}} />
+          <SettingsRow
+            icon="watch"
+            label="Device"
+            value={currentDevice?.name || "AURA One"}
+            onPress={() => navigation.navigate("Device")}
+          />
+          <SettingsRow icon="settings" label="Preferences" onPress={() => {}} last />
+        </View>
+
+        {/* Data */}
+        <MonoLabel color={colors.textDim} style={{ marginTop: s.xl }}>
+          YOUR DATA
+        </MonoLabel>
+        <View style={styles.group}>
+          <SettingsRow
+            icon="file-text"
+            label="Documents"
+            onPress={() => navigation.navigate("Pdf")}
+          />
+          <SettingsRow
+            icon="book-open"
+            label="Study data"
+            onPress={() => navigation.navigate("StudyPlanner")}
+            last
           />
         </View>
 
-        {/* AI Model Selection */}
-        <Text style={styles.sectionTitle}>AI REASONING PROVIDER</Text>
-        <GlassCard style={styles.modelCard} variant="surface2">
-          {["Claude 3.5 Sonnet", "Whisper + Claude + ElevenLabs", "Mock AI (Deterministic Demo)"].map(
-            (model) => {
-              const isSelected = selectedModel === model;
-              return (
-                <TouchableOpacity
-                  key={model}
-                  style={[styles.modelOption, isSelected && styles.modelOptionSelected]}
-                  onPress={() => setSelectedModel(model)}
-                >
-                  <View style={styles.modelRadio}>
-                    {isSelected && <View style={styles.modelRadioInner} />}
-                  </View>
-                  <Text style={[styles.modelName, isSelected && styles.modelNameSelected]}>
-                    {model}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }
-          )}
-        </GlassCard>
-
-        {/* Memories List */}
-        <Text style={styles.sectionTitle}>
-          STORED MEMORIES ({memories.length})
-        </Text>
-        {memories.map((m) => (
-          <View key={m.id} style={styles.memoryItem}>
-            <View style={styles.memDot} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.memContent}>{m.content}</Text>
-              <View style={styles.memTagsRow}>
-                {m.tags.map((t) => (
-                  <View key={t} style={styles.memTag}>
-                    <Text style={styles.memTagText}>{t}</Text>
-                  </View>
-                ))}
-                <Text style={styles.memImportance}>
-                  Priority: {m.importance.toUpperCase()}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={() => deleteMemory(m.id)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.memDelete}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
         {/* Logout */}
-        <AuraButton
-          title="Sign Out"
-          variant="danger"
-          size="md"
-          onPress={handleLogout}
-          style={{ marginTop: 20, marginBottom: 20 }}
-        />
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() => void handleLogout()}
+          disabled={isLoggingOut}
+        >
+          <Icon name="log-out" size={16} color={colors.error} />
+          <Text style={styles.logoutText}>
+            {isLoggingOut ? "Signing out…" : "Log out"}
+          </Text>
+        </TouchableOpacity>
 
-        <View style={{ height: 80 }} />
+        <MonoLabel color={colors.textDim} style={styles.versionText}>
+          AURA · VERSION 1.0.0
+        </MonoLabel>
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: s.xl,
   },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 16,
-    marginBottom: 16,
-  },
-  avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarLetter: {
-    color: colors.accent,
-    fontSize: 22,
-    fontWeight: "700",
+  identityBlock: {
+    marginTop: s.md,
+    marginBottom: s.xxl,
   },
   userName: {
-    color: colors.text1,
-    fontSize: 17,
-    fontWeight: "600",
+    lineHeight: 34,
   },
   userEmail: {
-    color: colors.text3,
-    fontSize: 12.5,
-    marginTop: 2,
+    color: colors.textMuted,
+    fontSize: 14,
+    marginTop: 4,
   },
-  planBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.surface2,
-    borderColor: colors.border,
+  rule: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginBottom: s.xl,
+  },
+  group: {
     borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-    marginTop: 6,
-  },
-  planText: {
-    color: colors.accent,
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  menuRow: {
-    backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  menuIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surface2,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  menuTitle: {
-    color: colors.text1,
-    fontSize: 13.5,
-    fontWeight: "600",
-  },
-  menuSubtitle: {
-    color: colors.text3,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  chevron: {
-    color: colors.text3,
-    fontSize: 20,
-    marginLeft: 8,
-  },
-  sectionTitle: {
-    color: colors.text3,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginTop: 10,
-    marginBottom: 10,
-    paddingHorizontal: 4,
-  },
-  modelCard: {
-    padding: 12,
-    marginBottom: 16,
-  },
-  modelOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
     borderRadius: radii.sm,
+    backgroundColor: colors.surfaceElevated,
+    marginTop: s.sm,
   },
-  modelOptionSelected: {
-    backgroundColor: colors.surfaceHover,
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: s.lg,
+    paddingVertical: 13,
   },
-  modelRadio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+  settingsRowBordered: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  settingsLabel: {
+    color: colors.ink,
+    fontSize: 14.5,
+    flex: 1,
+  },
+  settingsValue: {
+    color: colors.textDim,
+    fontSize: 13,
+  },
+  logoutBtn: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 10,
-  },
-  modelRadioInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-  },
-  modelName: {
-    color: colors.text2,
-    fontSize: 13,
-  },
-  modelNameSelected: {
-    color: colors.text1,
-    fontWeight: "600",
-  },
-  memoryItem: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    gap: 8,
+    paddingVertical: 13,
     borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 8,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceElevated,
+    marginTop: s.xxl,
   },
-  memDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.glow,
-    marginTop: 5,
-    marginRight: 10,
+  logoutText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: "500",
   },
-  memContent: {
-    color: colors.text1,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  memTagsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 6,
-  },
-  memTag: {
-    backgroundColor: colors.surface2,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radii.xs,
-  },
-  memTagText: {
-    color: colors.text3,
-    fontSize: 10,
-  },
-  memImportance: {
-    color: colors.warning,
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  memDelete: {
-    color: colors.text3,
-    fontSize: 13,
-    padding: 4,
-    marginLeft: 6,
+  versionText: {
+    textAlign: "center",
+    marginTop: s.xl,
   },
 });

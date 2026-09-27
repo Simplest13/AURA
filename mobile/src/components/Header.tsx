@@ -1,6 +1,15 @@
+/**
+ * PageHeader — editorial page head.
+ * Back control (mono arrow), restrained title, optional subtitle, technical
+ * device chip on the right.
+ */
+
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
-import { colors, radii } from "../theme/tokens";
+import { colors } from "../theme/colors";
+import { radii } from "../theme/spacing";
+import { Icon } from "./Icon";
+import { MonoLabel } from "./Typography";
 import { useDeviceStore } from "../stores/deviceStore";
 import { ConnectionState } from "../types/device";
 
@@ -37,12 +46,14 @@ export const Header: React.FC<HeaderProps> = ({
             style={styles.backBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.backIcon}>‹</Text>
+            <Icon name="chevron-left" size={20} color={colors.ink} />
           </TouchableOpacity>
         )}
-        <View>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle} · AI study assistant</Text> : null}
+        <View style={styles.titleBlock}>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
       </View>
 
@@ -51,20 +62,17 @@ export const Header: React.FC<HeaderProps> = ({
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={onDeviceBadgePress}
-            style={[
-              styles.deviceBadge,
-              isConnected ? styles.deviceConnected : styles.deviceDisconnected,
-            ]}
+            style={styles.deviceBadge}
           >
             <View
               style={[
                 styles.deviceDot,
-                { backgroundColor: isConnected ? colors.success : colors.warning },
+                { backgroundColor: isConnected ? colors.olive : colors.yellow },
               ]}
             />
-            <Text style={styles.deviceText}>
-              {isConnected ? `${batteryLevel}%` : "Offline"}
-            </Text>
+            <MonoLabel color={colors.textMuted}>
+              {isConnected ? `${batteryLevel}%` : "OFFLINE"}
+            </MonoLabel>
           </TouchableOpacity>
         )}
 
@@ -77,14 +85,14 @@ export const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 14,
     paddingBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-    backgroundColor: colors.bg,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
   },
   leftSection: {
     flexDirection: "row",
@@ -92,25 +100,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backBtn: {
-    marginRight: 12,
-    paddingHorizontal: 4,
+    marginRight: 10,
+    padding: 2,
   },
-  backIcon: {
-    color: colors.text1,
-    fontSize: 28,
-    fontWeight: "300",
-    lineHeight: 30,
+  titleBlock: {
+    flexShrink: 1,
   },
   title: {
-    color: colors.text1,
-    fontSize: 18,
-    fontWeight: "700",
+    color: colors.ink,
+    fontSize: 16.5,
+    fontWeight: "600",
     letterSpacing: -0.2,
   },
   subtitle: {
-    color: colors.text3,
-    fontSize: 11.5,
-    marginTop: 2,
+    color: colors.textDim,
+    fontSize: 12,
+    marginTop: 1,
   },
   rightSection: {
     flexDirection: "row",
@@ -120,28 +125,16 @@ const styles = StyleSheet.create({
   deviceBadge: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: radii.full,
+    borderRadius: radii.sm,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderWidth: 1,
-    gap: 5,
-  },
-  deviceConnected: {
-    backgroundColor: colors.surface2,
     borderColor: colors.border,
-  },
-  deviceDisconnected: {
-    backgroundColor: colors.warningSoft,
-    borderColor: colors.warning,
+    gap: 6,
   },
   deviceDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-  deviceText: {
-    color: colors.text2,
-    fontSize: 11,
-    fontWeight: "600",
   },
 });

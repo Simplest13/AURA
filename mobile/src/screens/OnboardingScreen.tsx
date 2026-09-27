@@ -7,53 +7,51 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
-import { colors, radii } from "../theme/tokens";
-import { AuraOrb } from "../components/AuraOrb";
-import { AuraButton } from "../components/AuraButton";
+import { colors } from "../theme/colors";
+import { spacing as s, radii } from "../theme/spacing";
+import { SerifText, MonoLabel } from "../components/Typography";
 import { useAuthStore } from "../stores/authStore";
 
 const FOCUS_AREAS = [
-  "Studying & Exams",
-  "Engineering Projects",
-  "Research Papers",
-  "Daily Productive Routine",
+  "Studying & exams",
+  "Engineering projects",
+  "Research papers",
+  "Daily routine",
 ];
 
 export const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { updateUser } = useAuthStore();
-  const [name, setName] = useState("Shivam");
+  const [name, setName] = useState("");
   const [selectedFocus, setSelectedFocus] = useState(0);
 
   const handleContinue = () => {
-    updateUser({ name });
+    updateUser({ name: name.trim() || "Student" });
     navigation.replace("MainTabs");
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.stepPills}>
-        <View style={[styles.pill, styles.pillActive]} />
-        <View style={styles.pill} />
-        <View style={styles.pill} />
-      </View>
+      <MonoLabel color={colors.textDim}>WELCOME</MonoLabel>
 
-      <AuraOrb state="idle" size={100} style={styles.orb} />
-
-      <Text style={styles.title}>What should AURA call you?</Text>
-      <Text style={styles.subtitle}>
-        And what are you mainly here for — we'll tune your study and memory around it.
-      </Text>
+      <SerifText size={30} style={styles.title}>
+        What should AURA{"\n"}
+        <SerifText size={30} italic>
+          call you?
+        </SerifText>
+      </SerifText>
 
       <TextInput
         style={styles.input}
         value={name}
         onChangeText={setName}
         placeholder="Your name"
-        placeholderTextColor={colors.text3}
+        placeholderTextColor={colors.textDim}
         autoCapitalize="words"
       />
 
-      <Text style={styles.sectionLabel}>YOUR PRIMARY FOCUS</Text>
+      <MonoLabel color={colors.textDim} style={{ marginBottom: s.md }}>
+        WHAT ARE YOU HERE FOR?
+      </MonoLabel>
       <View style={styles.focusGrid}>
         {FOCUS_AREAS.map((item, idx) => {
           const isSelected = selectedFocus === idx;
@@ -62,17 +60,10 @@ export const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) 
               key={item}
               activeOpacity={0.8}
               onPress={() => setSelectedFocus(idx)}
-              style={[
-                styles.focusCard,
-                isSelected && styles.focusCardActive,
-              ]}
+              style={[styles.focusCard, isSelected && styles.focusCardActive]}
             >
-              <Text
-                style={[
-                  styles.focusText,
-                  isSelected && styles.focusTextActive,
-                ]}
-              >
+              <View style={[styles.focusMarker, { backgroundColor: isSelected ? colors.coral : colors.border }]} />
+              <Text style={[styles.focusText, isSelected && styles.focusTextActive]}>
                 {item}
               </Text>
             </TouchableOpacity>
@@ -80,20 +71,13 @@ export const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         })}
       </View>
 
-      <View style={styles.buttonRow}>
-        <AuraButton
-          title="Skip"
-          variant="ghost"
-          onPress={handleContinue}
-          style={styles.skipBtn}
-        />
-        <AuraButton
-          title="Continue →"
-          variant="primary"
-          onPress={handleContinue}
-          style={styles.continueBtn}
-        />
-      </View>
+      <TouchableOpacity
+        style={styles.continueBtn}
+        onPress={handleContinue}
+        activeOpacity={0.85}
+      >
+        <MonoLabel color={colors.paper}>CONTINUE</MonoLabel>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -101,102 +85,65 @@ export const OnboardingScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: colors.bg,
-    alignItems: "center",
+    backgroundColor: colors.background,
     justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 40,
-  },
-  stepPills: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 24,
-  },
-  pill: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-  },
-  pillActive: {
-    backgroundColor: colors.accent,
-  },
-  orb: {
-    marginBottom: 20,
+    paddingHorizontal: s.xxl,
+    paddingVertical: s.huge,
   },
   title: {
-    color: colors.text1,
-    fontSize: 24,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: colors.text2,
-    fontSize: 13.5,
-    textAlign: "center",
-    maxWidth: 320,
-    lineHeight: 19,
-    marginBottom: 24,
+    marginTop: s.md,
+    marginBottom: s.xxl,
+    lineHeight: 38,
+    letterSpacing: -0.5,
   },
   input: {
-    width: "100%",
-    maxWidth: 280,
-    backgroundColor: colors.surface2,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.sm,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    color: colors.text1,
-    fontSize: 15,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  sectionLabel: {
-    color: colors.text3,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 12,
+    backgroundColor: "transparent",
+    borderColor: colors.borderLight,
+    borderBottomWidth: 1,
+    borderRadius: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 0,
+    color: colors.ink,
+    fontSize: 17,
+    marginBottom: s.xxl,
   },
   focusGrid: {
     width: "100%",
-    gap: 10,
-    marginBottom: 32,
+    gap: 8,
+    marginBottom: s.xxl,
   },
   focusCard: {
-    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.surfaceElevated,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     padding: 14,
-    alignItems: "center",
   },
   focusCardActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
+    borderColor: colors.borderLight,
+    backgroundColor: colors.surface,
+  },
+  focusMarker: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   focusText: {
-    color: colors.text2,
-    fontSize: 14,
+    color: colors.textMuted,
+    fontSize: 14.5,
     fontWeight: "500",
   },
   focusTextActive: {
-    color: colors.text1,
-    fontWeight: "600",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    width: "100%",
-    maxWidth: 280,
-  },
-  skipBtn: {
-    flex: 1,
+    color: colors.ink,
   },
   continueBtn: {
-    flex: 2,
+    width: "100%",
+    backgroundColor: colors.ink,
+    borderRadius: radii.sm,
+    paddingVertical: 15,
+    alignItems: "center",
   },
 });

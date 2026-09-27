@@ -3,15 +3,20 @@ import fetch from "node-fetch";
 import { config } from "../../config";
 import { getMockResponse } from "../../utils/mockData";
 
+export interface ChatTurn {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+const SYSTEM_PROMPT =
+  "You are AURA, a helpful student assistant. Give clear, accurate explanations that are appropriate for a university student, concise but complete. Use markdown formatting (headings, bullet points, tables) when it improves clarity.";
+
 /**
- * Retrieves an AI response for a given user prompt.
- * - In mock mode (`USE_MOCK_AI=true`) it returns a deterministic answer from `mockData`.
- * - In real mode it prefers OpenAI GPT and falls back to Anthropic Claude.
+ * Core multi-turn chat completion. Tries Groq first, then OpenAI, then Claude.
+ * Throws if every provider fails so callers can decide on fallbacks.
  */
-export async function getAIResponse(userId: string, prompt: string): Promise<string> {
-  if (config.useMockAI) {
-    return getMockResponse(prompt);
-  }
+export async function getAIChatResponse(messages: ChatTurn[]): Promise<string> {
+  const payloadMessages: ChatTurn[] = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
 
   if (config.groqApiKey) {
     try {
@@ -25,14 +30,7 @@ export async function getAIResponse(userId: string, prompt: string): Promise<str
         body: JSON.stringify({
           model: config.groqModel,
           temperature: 0.4,
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are AURA, a helpful student assistant. Give clear, accurate explanations that are appropriate for a university student, concise but complete.",
-            },
-            { role: "user", content: prompt },
-          ],
+          messages: payloadMessages,
         }),
       });
 
@@ -46,6 +44,7 @@ export async function getAIResponse(userId: string, prompt: string): Promise<str
       if (typeof text === "string" && text.trim()) {
         return text.trim();
       }
+      throw new Error("Groq returned an empty response");
     } catch (err) {
       console.warn("[AIService] Groq request failed, falling back to OpenAI:", err);
     }
@@ -63,14 +62,7 @@ export async function getAIResponse(userId: string, prompt: string): Promise<str
         body: JSON.stringify({
           model: config.openAIModel,
           temperature: 0.4,
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are AURA, a helpful student assistant. Give clear, accurate explanations that are appropriate for a university student, concise but complete.",
-            },
-            { role: "user", content: prompt },
-          ],
+          messages: payloadMessages,
         }),
       });
 
@@ -92,11 +84,11 @@ export async function getAIResponse(userId: string, prompt: string): Promise<str
   if (config.claudeApiKey) {
     try {
       const endpoint = "https://api.anthropic.com/v1/messages";
-      const body = {
-        model: "claude-3-5-sonnet-20240620",
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }],
-      };
+      // Claude has no "system" array role support in the same shape; extract it
+      const system = payloadMessages.find((m) => m.role === "system")?.content ?? "";
+      const convoMessages = payloadMessages
+        .filter((m) => m.role !== "system")
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -105,7 +97,12 @@ export async function getAIResponse(userId: string, prompt: string): Promise<str
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          model: "claude-3-5-sonnet-20240620",
+          max_tokens: 1024,
+          ...(system ? { system } : {}),
+          messages: convoMessages.length ? convoMessages : [{ role: "user", content: "Hello" }],
+        }),
       });
 
       if (!response.ok) {
@@ -123,9 +120,21 @@ export async function getAIResponse(userId: string, prompt: string): Promise<str
         return text.trim();
       }
     } catch (err) {
-      console.warn("[AIService] Claude request failed, falling back to the local mock engine:", err);
+      console.warn("[AIService] Claude request failed:", err);
     }
   }
 
-  return getMockResponse(prompt);
+  throw new Error("No AI provider available");
+}
+
+/** Back-compatible single-prompt helper used by several routes. */
+export async function getAIResponse(userId: string, prompt: string): Promise<string> {
+  if (config.useMockAI) {
+    return getMockResponse(prompt);
+  }
+  try {
+    return await getAIChatResponse([{ role: "user", content: prompt }]);
+  } catch {
+    return getMockResponse(prompt);
+  }
 }

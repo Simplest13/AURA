@@ -1,6 +1,11 @@
+/**
+ * VoiceWaveform — subtle level indication while listening/speaking.
+ * Small, low-amplitude bars; motion communicates activity, not decoration.
+ */
+
 import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated, ViewStyle } from "react-native";
-import { colors } from "../theme/tokens";
+import { View, StyleSheet, Animated, ViewStyle, Platform } from "react-native";
+import { colors } from "../theme/colors";
 
 interface VoiceWaveformProps {
   isActive?: boolean;
@@ -14,24 +19,24 @@ export const VoiceWaveform: React.FC<VoiceWaveformProps> = ({
   style,
 }) => {
   const bars = [
-    useRef(new Animated.Value(8)).current,
+    useRef(new Animated.Value(6)).current,
+    useRef(new Animated.Value(12)).current,
     useRef(new Animated.Value(18)).current,
-    useRef(new Animated.Value(28)).current,
-    useRef(new Animated.Value(14)).current,
-    useRef(new Animated.Value(24)).current,
     useRef(new Animated.Value(10)).current,
+    useRef(new Animated.Value(15)).current,
+    useRef(new Animated.Value(7)).current,
   ];
 
   useEffect(() => {
     if (!isActive) {
-      bars.forEach((b) => b.setValue(6));
+      bars.forEach((b) => b.setValue(4));
       return;
     }
 
     const animations = bars.map((bar, i) => {
-      const minH = 6 + (i % 3) * 4;
-      const maxH = 22 + (i % 4) * 8;
-      const dur = 350 + (i % 3) * 120;
+      const minH = 4 + (i % 3) * 3;
+      const maxH = 14 + (i % 4) * 5;
+      const dur = 480 + (i % 3) * 140;
 
       return Animated.loop(
         Animated.sequence([
@@ -80,10 +85,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
-    height: 48,
+    height: 28,
   },
   bar: {
-    width: 3.5,
-    borderRadius: 2,
+    width: 3,
+    borderRadius: 1.5,
   },
 });
